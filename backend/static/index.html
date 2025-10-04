@@ -1,248 +1,264 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NASA_2025 — Prototype</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NASA_2025 — Event Weather Planner</title>
   <style>
-    :root {
-      --bg: #0b1220;
-      --card: #121a2b;
-      --muted: #8aa0c6;
-      --text: #e7eefc;
-      --accent: #3aa3ff;
-      --accent-2: #00d4ff;
-      --ok: #41d888;
-      --warn: #ffb020;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
     body {
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #0b0c10 0%, #1f2833 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: start;
+      height: 100vh;
       margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      background: radial-gradient(1200px 600px at 70% -10%, rgba(58,163,255,.25), transparent 60%) , var(--bg);
-      color: var(--text);
-      display: grid;
-      grid-template-rows: 1fr auto;
-      min-height: 100vh;
+      padding: 1.5rem;
     }
-
-    /* Center stage */
-    .stage {
-      display: grid;
-      place-items: center;
-      padding: 24px;
+    h1 { margin-bottom: 0.3rem; color: #66fcf1; }
+    h2 { color: #45a29e; margin-top: 1.2rem; }
+    input, button {
+      padding: 0.6rem;
+      border-radius: 6px;
+      border: none;
+      margin: 0.3rem 0;
+      font-size: 1rem;
     }
-    .card {
-      width: min(680px, 92vw);
-      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 18px;
-      padding: 28px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: clamp(22px, 3vw, 28px);
-      letter-spacing: .4px;
-    }
-    p.lead {
-      margin: 0 0 22px;
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    .btn {
-      appearance: none;
-      border: 0;
-      padding: 14px 20px;
-      border-radius: 14px;
-      font-weight: 600;
-      font-size: 16px;
-      color: #08121f;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      box-shadow: 0 8px 18px rgba(0, 212, 255, .25);
+    input { width: 100%; max-width: 320px; }
+    button {
       cursor: pointer;
-      transition: transform .06s ease, box-shadow .2s ease, filter .2s ease;
-      width: 100%;
+      background-color: #45a29e;
+      color: #0b0c10;
+      font-weight: 600;
     }
-    .btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
-    .btn:active { transform: translateY(1px); }
-
-    .row { display: grid; grid-template-columns: 1fr; gap: 14px; }
-    @media (min-width: 560px) { .row { grid-template-columns: 1fr 1fr; } }
-
-    /* Bottom weather bar */
-    .weather-bar {
-      position: sticky;
+    button:hover { background-color: #66fcf1; }
+    .card {
+      background: #1f2833;
+      border-radius: 10px;
+      padding: 1.5rem 1.8rem;
+      margin: 1rem 0;
+      width: 100%;
+      max-width: 460px;
+      box-shadow: 0 0 12px rgba(102, 252, 241, 0.3);
+    }
+    .hidden { display: none; }
+    .list { margin-top: .5rem; }
+    .list-item {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: .6rem; padding: .6rem .4rem; border-bottom: 1px solid #2b3442;
+    }
+    .list-item button {
+      padding: .4rem .6rem; font-size: .9rem;
+    }
+    #weatherBar {
+      position: fixed;
       bottom: 0;
       width: 100%;
-      background: rgba(10, 16, 30, 0.9);
-      border-top: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(6px);
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: center;
-      padding: 10px 14px;
-      font-size: 14px;
-      color: var(--muted);
+      text-align: center;
+      padding: 0.8rem;
+      background: rgba(31, 40, 51, 0.95);
+      border-top: 1px solid #45a29e;
+      font-size: 0.9rem;
     }
-    .weather-pill {
-      display: inline-grid;
-      grid-auto-flow: column;
-      gap: 10px;
-      align-items: center;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.08);
-      padding: 8px 12px;
-      border-radius: 999px;
-      color: var(--text);
-    }
-    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ok); box-shadow: 0 0 0 2px rgba(65,216,136,.2); }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; color: #cfe3ff; }
-    .link { color: var(--accent-2); text-decoration: none; }
-    .link:hover { text-decoration: underline; }
+    #logoutBtn { margin-top: 1rem; background-color: #c0392b; color: #fff; }
+    #logoutBtn:hover { background-color: #e74c3c; }
+    ul.tips { padding-left: 1.2rem; }
+    ul.tips li { margin: .25rem 0; }
+    .muted { color:#a8b3d1; font-size:.95rem; }
   </style>
 </head>
 <body>
+  <h1>NASA_2025</h1>
+  <p class="muted">Plan your perfect event — powered by NASA & Meteomatics</p>
 
-  <!-- MAIN -->
-  <main class="stage" role="main">
-    <section class="card" aria-label="Planner">
-      <h1>NASA_2025 • Event Weather Planner</h1>
-      <p class="lead">
-        Plan months ahead using NASA data (prototype). Click the button below to start planning an event.
-        For now, results are dummy placeholders — we’ll wire them to the Flask API later.
-      </p>
+  <!-- LOGIN PAGE -->
+  <div id="loginCard" class="card">
+    <h2>Login</h2>
+    <input id="loginUsername" placeholder="Username" autocomplete="off" />
+    <input id="loginPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
+    <button onclick="login()">Login</button>
+    <p id="loginMsg"></p>
+    <p>Don’t have an account? <a href="#" onclick="showSignup()">Sign up</a></p>
+  </div>
 
-      <div class="row" style="margin-top: 12px;">
-        <button id="planBtn" class="btn">Plan an event</button>
-      </div>
+  <!-- SIGNUP PAGE -->
+  <div id="signupCard" class="card hidden">
+    <h2>Sign Up</h2>
+    <input id="signupUsername" placeholder="Choose username" autocomplete="off" />
+    <input id="signupPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
+    <button onclick="signup()">Create Account</button>
+    <p id="signupMsg"></p>
+    <p>Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
+  </div>
 
-      <!-- Result block -->
-      <div id="result" style="margin-top:18px; display:none;">
-        <h2 style="margin:0 0 8px; font-size:18px;">Draft plan</h2>
-        <div id="resultBody" class="mono" style="white-space:pre-wrap;"></div>
-      </div>
-    </section>
-  </main>
+  <!-- MAIN DASHBOARD -->
+  <div id="mainCard" class="card hidden">
+    <h2>Create Event</h2>
+    <input id="eventName" placeholder="Event name (e.g., Picnic, Flying Drone)" />
+    <input id="eventDate" type="date" />
+    <input id="eventCity" placeholder="City (auto-detected or type manually)" />
+    <button onclick="planEvent()">Plan Event</button>
+    <p id="eventMsg"></p>
 
-  <!-- WEATHER FOOTER -->
-  <footer id="weatherBar" class="weather-bar" aria-live="polite">
-    <div>
-      <span style="font-weight:600; color:#dce9ff;">Local weather</span>
-      <span id="wxStatus" class="mono">… locating</span>
-    </div>
-    <div class="weather-pill" title="Connection status">
-      <span class="dot" aria-hidden="true"></span>
-      <span class="mono">API: mock</span>
-    </div>
-  </footer>
+    <h2>Your Events</h2>
+    <div id="eventsList" class="list"></div>
+
+    <button id="logoutBtn" onclick="logout()">Logout</button>
+  </div>
+
+  <!-- EVENT DETAILS PAGE -->
+  <div id="eventCard" class="card hidden">
+    <button onclick="showMain()" style="float:right;">← Back</button>
+    <h2 id="eventTitle">Event</h2>
+    <p id="eventSub" class="muted">Date & Location</p>
+    <h3>Suggested prep</h3>
+    <p id="eventHeadline" style="margin:.2rem 0 0.6rem;"></p>
+    <ul id="eventTips" class="tips"></ul>
+    <p class="muted" id="eventNote"></p>
+  </div>
+
+  <div id="weatherBar">Detecting location & weather...</div>
 
   <script>
-    // ---------------------------
-    // Simple state & helpers
-    // ---------------------------
-    const $ = (sel) => document.querySelector(sel);
-    const planBtn = $('#planBtn');
-    const result = $('#result');
-    const resultBody = $('#resultBody');
-    const wxStatus = $('#wxStatus');
+    const API_BASE = "";
+    let TOKEN = localStorage.getItem("token") || null;
 
-    // Formatting helpers
-    const fmtPct = (x) => `${Math.round(x * 100)}%`;
-    const fmtTemp = (c) => `${c.toFixed(1)}°C`;
+    // Simple router helpers
+    function hideAll() { document.querySelectorAll(".card").forEach(c => c.classList.add("hidden")); }
+    function showLogin()  { hideAll(); document.getElementById("loginCard").classList.remove("hidden"); }
+    function showSignup() { hideAll(); document.getElementById("signupCard").classList.remove("hidden"); }
+    function showMain()   { hideAll(); document.getElementById("mainCard").classList.remove("hidden"); fetchEvents(); }
+    function showEvent()  { hideAll(); document.getElementById("eventCard").classList.remove("hidden"); }
 
-    // ---------------------------
-    // Dummy "Plan an event" flow
-    // ---------------------------
-    planBtn.addEventListener('click', async () => {
-      // In the real app, you’d open a date/location picker here and call your Flask API.
-      // For now we simulate a response.
-      result.style.display = 'block';
-      resultBody.textContent = 'Querying NASA datasets…\n';
-
-      // Fake latency
-      await new Promise(r => setTimeout(r, 600));
-
-      // Dummy response payload (shape similar to your future API)
-      const payload = {
-        input: {
-          date: '2025-06-07',
-          location: { name: 'Your chosen spot', lat: window.__lat ?? 1.2903, lon: window.__lon ?? 103.8519 }
-        },
-        summary: {
-          rain_probability: 0.42,
-          avg_temp_c: 26.2,
-          extreme_heat_probability: 0.10,
-          note: 'Consider an umbrella and extra ice for desserts.'
-        }
-      };
-
-      const text =
-`Date: ${payload.input.date}
-Location: ${payload.input.location.name} (${payload.input.location.lat.toFixed(4)}, ${payload.input.location.lon.toFixed(4)})
-
-• Chance of rain: ${fmtPct(payload.summary.rain_probability)}
-• Average daytime temperature: ${fmtTemp(payload.summary.avg_temp_c)}
-• Heatwave risk: ${fmtPct(payload.summary.extreme_heat_probability)}
-
-Suggestion: ${payload.summary.note}`;
-
-      resultBody.textContent = text;
+    window.addEventListener("load", () => {
+      if (TOKEN) showMain(); else showLogin();
+      getWeatherBar();
     });
 
-    // ---------------------------
-    // Bottom weather (mock)
-    // ---------------------------
-    // We’ll attempt to get the user’s coordinates so we can show them in the footer.
-    // Weather values are dummy for now; later, call your Flask endpoint or a weather API.
-    function setWeatherText(txt) { wxStatus.textContent = `— ${txt}`; }
-
-    function setDummyWeather(lat, lon) {
-      // Dummy logic: temp depends a tiny bit on lat; condition rotates by minutes.
-      const m = new Date().getMinutes();
-      const conditions = ['Clear', 'Partly cloudy', 'Overcast', 'Light rain'];
-      const cond = conditions[m % conditions.length];
-      const temp = 27 + Math.sin((lat || 0) / 30) * 2; // silly variation
-      setWeatherText(`${cond}, ${fmtTemp(temp)} @ ${lat?.toFixed?.(3) ?? '?.???'}, ${lon?.toFixed?.(3) ?? '?.???'}`);
+    // ---------------- AUTH ----------------
+    async function signup() {
+      const username = document.getElementById("signupUsername").value.trim().toLowerCase();
+      const pin = document.getElementById("signupPin").value.trim();
+      const res = await fetch(`${API_BASE}/signup`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, pin }),
+      });
+      const data = await res.json();
+      if (data.ok) { TOKEN = data.token; localStorage.setItem("token", TOKEN); showMain(); }
+      else { document.getElementById("signupMsg").textContent = data.error || "Signup failed"; }
     }
 
-    function geolocate() {
-      if (!navigator.geolocation) {
-        setWeatherText('Geolocation unavailable — using mock data.');
-        setDummyWeather(null, null);
+    async function login() {
+      const username = document.getElementById("loginUsername").value.trim().toLowerCase();
+      const pin = document.getElementById("loginPin").value.trim();
+      const res = await fetch(`${API_BASE}/login`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, pin }),
+      });
+      const data = await res.json();
+      if (data.ok) { TOKEN = data.token; localStorage.setItem("token", TOKEN); showMain(); }
+      else { document.getElementById("loginMsg").textContent = data.error || "Login failed"; }
+    }
+
+    function logout() { TOKEN = null; localStorage.removeItem("token"); showLogin(); }
+
+    // ------------- EVENTS (list + create) -------------
+    async function planEvent() {
+      const name = document.getElementById("eventName").value.trim();
+      const date = document.getElementById("eventDate").value;
+      const city = document.getElementById("eventCity").value.trim();
+      const msg = document.getElementById("eventMsg");
+
+      if (!name || !date) { msg.textContent = "Enter event name and date"; return; }
+
+      msg.textContent = "Saving…";
+      const body = { event_name: name, city, date };
+      if (window.currentCoords) { body.lat = window.currentCoords.lat; body.lon = window.currentCoords.lon; }
+
+      try {
+        const res = await fetch(`${API_BASE}/events`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.ok && data.id) {
+          msg.textContent = "Event added ✅";
+          document.getElementById("eventName").value = "";
+          document.getElementById("eventDate").value = "";
+          await fetchEvents();
+        } else {
+          msg.textContent = "Error: " + (data.error || "Unknown");
+          console.error("create failed:", data);
+        }
+      } catch (e) {
+        msg.textContent = "Network error";
+        console.error(e);
+      }
+    }
+
+    async function fetchEvents() {
+      const res = await fetch(`${API_BASE}/events`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+      const data = await res.json();
+      const list = document.getElementById("eventsList");
+      list.innerHTML = "";
+      if (!Array.isArray(data) || data.length === 0) {
+        list.textContent = "No events yet.";
         return;
       }
+      data.forEach(e => {
+        const row = document.createElement("div");
+        row.className = "list-item";
+        const title = document.createElement("div");
+        title.textContent = `${e.event_name} — ${e.date}`;
+        const btn = document.createElement("button");
+        btn.textContent = "View";
+        btn.onclick = () => openEventDetails(e);
+        row.appendChild(title);
+        row.appendChild(btn);
+        list.appendChild(row);
+      });
+    }
+
+    // --------- EVENT DETAILS (separate screen) ---------
+    async function openEventDetails(e) {
+      // Fill header
+      document.getElementById("eventTitle").textContent = e.event_name;
+      document.getElementById("eventSub").textContent = `${e.date}${e.city ? " • " + e.city : ""}`;
+      // Fetch suggestions for this event
+      const res = await fetch(`${API_BASE}/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+        body: JSON.stringify({ event_name: e.event_name, date: e.date, lat: e.lat, lon: e.lon }),
+      });
+      const data = await res.json();
+      document.getElementById("eventHeadline").textContent = `Predicted weather: ${data.predicted || "—"}`;
+      const tips = document.getElementById("eventTips"); tips.innerHTML = "";
+      (data.advice || []).forEach(t => {
+        const li = document.createElement("li"); li.textContent = t; tips.appendChild(li);
+      });
+      document.getElementById("eventNote").textContent = data.note || "";
+      // Show screen
+      showEvent();
+    }
+
+    // ---------------- WEATHER BAR ----------------
+    async function getWeatherBar() {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const { latitude, longitude } = pos.coords;
-          window.__lat = latitude;
-          window.__lon = longitude;
-          setDummyWeather(latitude, longitude);
+          window.currentCoords = { lat: latitude, lon: longitude };
+          document.getElementById("weatherBar").textContent =
+            `Location: (${latitude.toFixed(2)}, ${longitude.toFixed(2)}) — live weather to be added`;
         },
         () => {
-          setWeatherText('Location blocked — using mock coordinates.');
-          setDummyWeather(1.2903, 103.8519); // mock: Singapore
-        },
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+          document.getElementById("weatherBar").textContent =
+            "Location access denied — please type your city manually.";
+        }
       );
     }
-
-    geolocate();
-
-    // ---------------------------
-    // (Optional) Future hooks
-    // ---------------------------
-    // Example: calling your Flask API later
-    // async function fetchProbabilities(lat, lon, date) {
-    //   const url = `http://localhost:8000/probability?lat=${lat}&lon=${lon}&date=${date}`;
-    //   const res = await fetch(url);
-    //   if (!res.ok) throw new Error('API error');
-    //   return res.json();
-    // }
   </script>
 </body>
 </html>
