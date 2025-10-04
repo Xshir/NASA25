@@ -22,7 +22,13 @@
         linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
       -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
     }
-    #app{ min-height:100dvh; display:flex; flex-direction:column; align-items:center; padding:24px 16px 72px; transition:filter .25s ease, opacity .25s ease; }
+
+    #app{
+      min-height:100dvh;
+      display:flex; flex-direction:column; align-items:center;
+      padding:24px 16px 72px;
+      transition:filter .25s ease, opacity .25s ease;
+    }
     #app.blurred{ filter:blur(12px) saturate(85%) brightness(.85); }
 
     h1{color:var(--teal); margin:.2rem 0 .3rem; letter-spacing:.4px}
@@ -41,14 +47,20 @@
     .card:active{transform:translateY(1px)}
     .hidden{display:none}
 
-    .header{ display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center;
-      padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
+    .header{
+      display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center;
+      padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+    }
     .time{font-size:1.25rem; font-weight:700}
     .loc{font-size:.95rem; color:var(--muted)}
     .wx{font-size:.95rem; opacity:.9}
 
-    .btn{ padding:.55rem .9rem; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem;
-      transition:transform .05s ease, background .2s ease, box-shadow .2s ease; box-shadow:none; }
+    .btn{
+      padding:.55rem .9rem; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem;
+      transition:transform .05s ease, background .2s ease, box-shadow .2s ease;
+      box-shadow:none;
+    }
     .btn:active{transform:translateY(1px)}
     .btn-primary{background:var(--mint); color:#0b0c10;}
     .btn-primary:hover{background:var(--teal); box-shadow:0 10px 24px rgba(102,252,241,.25);}
@@ -56,33 +68,48 @@
     .btn-ghost:hover{background:#2a3b53; box-shadow:0 10px 24px rgba(0,0,0,.25);}
 
     .list{margin-top:.5rem}
-    .item{ display:grid; grid-template-columns:1fr auto; gap:.6rem; align-items:center;
-      padding:.7rem .35rem; border-bottom:1px solid rgba(255,255,255,.06); }
+    .item{
+      display:grid; grid-template-columns:1fr auto; gap:.6rem; align-items:center;
+      padding:.7rem .35rem; border-bottom:1px solid rgba(255,255,255,.06);
+    }
     .item-title{font-weight:700; letter-spacing:.2px}
     .item-sub{color:var(--muted); font-size:.95rem}
     .btn-row{display:flex; gap:.45rem}
 
-    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1000;
-      background:rgba(9,14,22,.55); animation:fadeIn .18s ease; }
+    .modal{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1000;
+      background:rgba(9,14,22,.55);
+      animation:fadeIn .18s ease;
+    }
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-    .sheet{ background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-      border:1px solid rgba(255,255,255,.10); border-radius:16px; width:min(92vw,560px); padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+    .sheet{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px; width:min(92vw,560px); padding:18px;
+      box-shadow:0 20px 60px rgba(0,0,0,.5);
+    }
     .row{display:grid; gap:.9rem}
     .row-2{grid-template-columns:1fr 1fr}
     label{font-size:.92rem; color:var(--muted); display:block; margin:.2rem 0 .35rem}
-    input,select{ width:100%; padding:.65rem .75rem; border:1px solid var(--stroke); border-radius:10px;
-      background:#0f1928; color:#fff; font-size:1rem; outline:none; box-shadow:0 3px 0 rgba(0,0,0,.25) inset; }
+    input,select{
+      width:100%; padding:.65rem .75rem; border:1px solid var(--stroke); border-radius:10px;
+      background:#0f1928; color:#fff; font-size:1rem; outline:none;
+      box-shadow:0 3px 0 rgba(0,0,0,.25) inset;
+    }
+
     .date-line{display:flex; align-items:center; gap:.8rem}
     .date-label{min-width:150px; color:var(--muted)}
     .date-wrap{position:relative; width:46px; height:46px}
-    .icon-btn{ width:46px; height:46px; border-radius:12px; background:#213247; border:1px solid var(--stroke);
-      display:flex; align-items:center; justify-content:center; }
+    .icon-btn{
+      width:46px; height:46px; border-radius:12px; background:#213247; border:1px solid var(--stroke);
+      display:flex; align-items:center; justify-content:center;
+    }
     .icon-btn:hover{background:#2a3b53}
     .date-overlay{position:absolute; inset:0; opacity:0; cursor:pointer}
     .calendar-emoji{font-size:20px}
+
     #cityOther{margin-top:.4rem}
 
-    /* Gate & bottom bar */
     #gate{ position:fixed; inset:0; background:rgba(5,10,18,.92); display:none; align-items:center; justify-content:center; z-index:1500; }
     #gate .panel{ background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,520px); }
     #gate ul{margin:.5rem 0 .75rem 1.2rem}
@@ -196,19 +223,18 @@
     </div>
   </div>
 
-  <!-- Location gate (persistent guidance + auto-retry) -->
+  <!-- Location gate -->
   <div id="gate">
     <div class="panel">
       <h2>Location is required</h2>
-      <p class="muted">We need your location to tailor weather guidance for your plans.</p>
+      <p class="muted">We use your location to tailor weather guidance for your plans.</p>
       <ul class="muted">
-        <li>If you previously selected <b>Block</b>, please allow location for this site in your browser settings.</li>
-        <li>After changing the setting, return here and click <b>Try again</b>.</li>
+        <li>If you previously selected <b>Block</b>, allow location for this site in your browser settings.</li>
+        <li>Then come back and tap <b>Ask for location</b>.</li>
       </ul>
       <div style="display:flex; gap:.5rem; flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="ensureGeoPermission()">Try again</button>
+        <button class="btn btn-primary" onclick="askForLocation()">Ask for location</button>
         <button class="btn btn-ghost" onclick="openHelp()">How to allow</button>
-        <button class="btn btn-ghost" onclick="location.reload()">Reload</button>
       </div>
       <p id="gateMsg" class="muted" style="margin-top:.6rem;"></p>
     </div>
@@ -217,11 +243,11 @@
   <div id="weatherBar">Requesting location permission…</div>
 
   <script>
-    // -------------------- Global & Router --------------------
+    // ---------- Globals & routing ----------
     const API_BASE = "";
     let TOKEN = localStorage.getItem("token") || null;
     let currentDateISO = "";
-    let plannerMode = "create"; // or "edit"
+    let plannerMode = "create";
     let editingId = null;
 
     function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")); }
@@ -232,12 +258,12 @@
 
     window.addEventListener("load", () => {
       tickClock(); setInterval(tickClock, 1000);
-      ensureGeoPermission();      // <-- new
+      ensureGeoPermission();
       if (TOKEN) showHome(); else showLogin();
       wireDatePicker();
     });
 
-    // -------------------- Auth --------------------
+    // ---------- Auth ----------
     async function signup(){
       const username = document.getElementById("signupUsername").value.trim().toLowerCase();
       const pin = document.getElementById("signupPin").value.trim();
@@ -256,7 +282,7 @@
     }
     function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin(); }
 
-    // -------------------- Clock --------------------
+    // ---------- Clock ----------
     function tickClock(){
       const now = new Date();
       const hh = now.getHours().toString().padStart(2,"0");
@@ -264,27 +290,29 @@
       document.getElementById("clock").textContent = `${hh}:${mm}`;
     }
 
-    // -------------------- Geolocation with auto-retry --------------------
+    // ---------- Geolocation with prompt control ----------
+    function askForLocation(){ requestLocation(true); }
+
     async function ensureGeoPermission(){
-      // Use Permissions API where available
       const gateMsg = document.getElementById("gateMsg");
       try{
-        if (navigator.permissions && navigator.permissions.query){
+        if (navigator.permissions?.query){
           const status = await navigator.permissions.query({name:"geolocation"});
-          // react immediately and on future changes
           const apply = () => {
-            if (status.state === "granted") { hideGate(); requestLocation(); }
-            else if (status.state === "prompt") { hideGate(); requestLocation(true); } // will show native prompt
-            else { showGate(); gateMsg.textContent = "Location is blocked for this site. Please allow it in your browser settings, then click Try again."; }
+            if (status.state === "granted"){
+              hideGate(); requestLocation(false);
+            } else if (status.state === "prompt"){
+              showGate(); gateMsg.textContent = "Tap “Ask for location” to continue.";
+            } else {
+              showGate(); gateMsg.textContent = "Location is blocked for this site. Allow it in your browser settings, then tap “Ask for location”.";
+            }
           };
           status.onchange = apply;
           apply();
         } else {
-          // Older browsers: just try; if denied, fall back to gate
           requestLocation(true);
         }
-      }catch(e){
-        // Fallback to simple attempt
+      } catch {
         requestLocation(true);
       }
     }
@@ -297,10 +325,9 @@
         hideGate();
         await prefillLocation(latitude, longitude);
       }, (err)=>{
-        if (err && err.code === err.PERMISSION_DENIED){
-          // If user denied, show gate and wait for them to change site permission.
+        if (err?.code === err.PERMISSION_DENIED){
           showGate();
-          document.getElementById("gateMsg").textContent = "Permission denied. Allow location for this site, then press Try again.";
+          document.getElementById("gateMsg").textContent = "Permission denied. Allow location for this site, then press “Ask for location”.";
         } else {
           showGate();
           document.getElementById("gateMsg").textContent = "Unable to get location. Please try again.";
@@ -309,9 +336,8 @@
     }
 
     function openHelp(){
-      // Open helpful docs based on browser (best-effort)
       const ua = navigator.userAgent.toLowerCase();
-      let url = "https://support.google.com/chrome/answer/142065?hl=en"; // default: Chrome help
+      let url = "https://support.google.com/chrome/answer/142065?hl=en";
       if (ua.includes("firefox")) url = "https://support.mozilla.org/en-US/kb/site-permissions";
       else if (ua.includes("safari") && !ua.includes("chrome")) url = "https://support.apple.com/guide/safari/safo40501/mac";
       else if (ua.includes("edg/")) url = "https://support.microsoft.com/topic/manage-location-permissions-in-microsoft-edge";
@@ -333,7 +359,7 @@
     function showGate(){ document.getElementById("gate").style.display="flex"; }
     function hideGate(){ document.getElementById("gate").style.display="none"; }
 
-    // -------------------- Planner (Create/Edit) --------------------
+    // ---------- Planner ----------
     function openPlanner(mode="create", ev=null){
       plannerMode = mode;
       editingId = ev?.id ?? null;
@@ -418,7 +444,7 @@
       label.textContent = `${day} ${mo} ${yr}`;
     }
 
-    // -------------------- Country / City --------------------
+    // ---------- Country / City ----------
     const COUNTRIES = [
       "Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","India","China","Japan","South Korea",
       "Australia","New Zealand","United States","Canada","United Kingdom","Germany","France","Spain","Italy","Netherlands"
@@ -454,7 +480,7 @@
       return sel.value==="__OTHER__" ? document.getElementById("cityOther").value.trim() : sel.value;
     }
 
-    // -------------------- Events --------------------
+    // ---------- Events ----------
     async function fetchEvents(){
       const r = await fetch(`/events`, {headers:{Authorization:`Bearer ${TOKEN}`}});
       const data = await r.json();
