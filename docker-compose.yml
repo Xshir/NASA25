@@ -1,29 +1,30 @@
-version: "3.9"
-
 services:
-  api:
-    build: ./backend
+  nasa2025_api:
+    build:
+      context: .          # <— root as context so backend/ exists
+      dockerfile: Dockerfile
     container_name: nasa2025_api
     ports:
-      - "127.0.0.1:5000:8000"
+      - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://nasa2025:nasa2025_pw@db:5432/nasa2025
-      GUNICORN_WORKERS: 4   # can adjust 
+      POSTGRES_HOST: db
+      POSTGRES_DB: nasa2025
+      POSTGRES_USER: nasa2025
+      POSTGRES_PASSWORD: nasa2025
+      APP_SECRET: super-secret-change-me
+      GUNICORN_CMD_ARGS: "--workers=1 --log-level=debug --capture-output --enable-stdio-inheritance"
     depends_on:
       - db
-
   db:
     image: postgis/postgis:16-3.4
     container_name: nasa2025_db
     environment:
-      POSTGRES_USER: nasa2025
-      POSTGRES_PASSWORD: nasa2025_pw
       POSTGRES_DB: nasa2025
+      POSTGRES_USER: nasa2025
+      POSTGRES_PASSWORD: nasa2025
     ports:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-
 volumes:
   pgdata:
