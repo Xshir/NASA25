@@ -22,14 +22,7 @@
         linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
       -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
     }
-
-    /* ---- App wrapper (blur target) ---- */
-    #app{
-      min-height:100dvh;
-      display:flex; flex-direction:column; align-items:center;
-      padding:24px 16px 72px;
-      transition:filter .25s ease, opacity .25s ease;
-    }
+    #app{ min-height:100dvh; display:flex; flex-direction:column; align-items:center; padding:24px 16px 72px; transition:filter .25s ease, opacity .25s ease; }
     #app.blurred{ filter:blur(12px) saturate(85%) brightness(.85); }
 
     h1{color:var(--teal); margin:.2rem 0 .3rem; letter-spacing:.4px}
@@ -48,78 +41,52 @@
     .card:active{transform:translateY(1px)}
     .hidden{display:none}
 
-    /* ---- Header strip ---- */
-    .header{
-      display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center;
-      padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.08);
-    }
+    .header{ display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center;
+      padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
     .time{font-size:1.25rem; font-weight:700}
     .loc{font-size:.95rem; color:var(--muted)}
     .wx{font-size:.95rem; opacity:.9}
 
-    /* ---- Buttons ---- */
-    .btn{
-      padding:.55rem .9rem; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem;
-      transition:transform .05s ease, background .2s ease, box-shadow .2s ease;
-      box-shadow:none; /* no permanent glow */
-    }
+    .btn{ padding:.55rem .9rem; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem;
+      transition:transform .05s ease, background .2s ease, box-shadow .2s ease; box-shadow:none; }
     .btn:active{transform:translateY(1px)}
     .btn-primary{background:var(--mint); color:#0b0c10;}
-    .btn-primary:hover{background:var(--teal); box-shadow:0 10px 24px rgba(102,252,241,.25);} /* hover glow only */
+    .btn-primary:hover{background:var(--teal); box-shadow:0 10px 24px rgba(102,252,241,.25);}
     .btn-ghost{background:#223043; color:#e6f7f6; border:1px solid var(--stroke)}
-    .btn-ghost:hover{background:#2a3b53; box-shadow:0 10px 24px rgba(0,0,0,.25);} /* hover glow only */
+    .btn-ghost:hover{background:#2a3b53; box-shadow:0 10px 24px rgba(0,0,0,.25);}
 
-    /* ---- Events list ---- */
     .list{margin-top:.5rem}
-    .item{
-      display:grid; grid-template-columns:1fr auto; gap:.6rem; align-items:center;
-      padding:.7rem .35rem; border-bottom:1px solid rgba(255,255,255,.06);
-    }
+    .item{ display:grid; grid-template-columns:1fr auto; gap:.6rem; align-items:center;
+      padding:.7rem .35rem; border-bottom:1px solid rgba(255,255,255,.06); }
     .item-title{font-weight:700; letter-spacing:.2px}
     .item-sub{color:var(--muted); font-size:.95rem}
     .btn-row{display:flex; gap:.45rem}
 
-    /* ---- Modal / Planner ---- */
-    .modal{
-      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1000;
-      background:rgba(9,14,22,.55); /* dim layer */
-      animation:fadeIn .18s ease;
-    }
+    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1000;
+      background:rgba(9,14,22,.55); animation:fadeIn .18s ease; }
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-    .sheet{
-      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:16px; width:min(92vw,560px); padding:18px;
-      box-shadow:0 20px 60px rgba(0,0,0,.5);
-    }
+    .sheet{ background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.10); border-radius:16px; width:min(92vw,560px); padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
     .row{display:grid; gap:.9rem}
     .row-2{grid-template-columns:1fr 1fr}
     label{font-size:.92rem; color:var(--muted); display:block; margin:.2rem 0 .35rem}
-    input,select{
-      width:100%; padding:.65rem .75rem; border:1px solid var(--stroke); border-radius:10px;
-      background:#0f1928; color:#fff; font-size:1rem; outline:none;
-      box-shadow:0 3px 0 rgba(0,0,0,.25) inset;
-    }
-
-    /* Date control */
+    input,select{ width:100%; padding:.65rem .75rem; border:1px solid var(--stroke); border-radius:10px;
+      background:#0f1928; color:#fff; font-size:1rem; outline:none; box-shadow:0 3px 0 rgba(0,0,0,.25) inset; }
     .date-line{display:flex; align-items:center; gap:.8rem}
     .date-label{min-width:150px; color:var(--muted)}
     .date-wrap{position:relative; width:46px; height:46px}
-    .icon-btn{
-      width:46px; height:46px; border-radius:12px; background:#213247; border:1px solid var(--stroke);
-      display:flex; align-items:center; justify-content:center;
-    }
+    .icon-btn{ width:46px; height:46px; border-radius:12px; background:#213247; border:1px solid var(--stroke);
+      display:flex; align-items:center; justify-content:center; }
     .icon-btn:hover{background:#2a3b53}
     .date-overlay{position:absolute; inset:0; opacity:0; cursor:pointer}
     .calendar-emoji{font-size:20px}
-
     #cityOther{margin-top:.4rem}
 
     /* Gate & bottom bar */
-    #gate{position:fixed; inset:0; background:rgba(5,10,18,.92); display:none; align-items:center; justify-content:center; z-index:1500}
-    #gate .panel{background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,420px)}
-    #weatherBar{position:fixed; bottom:0; left:0; right:0; text-align:center; padding:.55rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(18,27,41,.92); font-size:.92rem}
+    #gate{ position:fixed; inset:0; background:rgba(5,10,18,.92); display:none; align-items:center; justify-content:center; z-index:1500; }
+    #gate .panel{ background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,520px); }
+    #gate ul{margin:.5rem 0 .75rem 1.2rem}
+    #weatherBar{ position:fixed; bottom:0; left:0; right:0; text-align:center; padding:.55rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(18,27,41,.92); font-size:.92rem }
   </style>
 </head>
 <body>
@@ -159,7 +126,6 @@
           <div class="loc" id="locLine">Locating…</div>
         </div>
         <div class="wx" id="wxNow">Weather: (coming soon)</div>
-        <!-- Plan button beside weather (only primary persistent button) -->
         <button class="btn btn-primary" onclick="openPlanner('create')">Plan</button>
       </div>
 
@@ -230,12 +196,21 @@
     </div>
   </div>
 
-  <!-- Location gate & bottom bar -->
+  <!-- Location gate (persistent guidance + auto-retry) -->
   <div id="gate">
     <div class="panel">
-      <h2>Location required</h2>
-      <p class="muted">We use your location to tailor weather guidance. Please allow location access to continue.</p>
-      <button class="btn btn-primary" onclick="retryLocation()">Try Again</button>
+      <h2>Location is required</h2>
+      <p class="muted">We need your location to tailor weather guidance for your plans.</p>
+      <ul class="muted">
+        <li>If you previously selected <b>Block</b>, please allow location for this site in your browser settings.</li>
+        <li>After changing the setting, return here and click <b>Try again</b>.</li>
+      </ul>
+      <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="ensureGeoPermission()">Try again</button>
+        <button class="btn btn-ghost" onclick="openHelp()">How to allow</button>
+        <button class="btn btn-ghost" onclick="location.reload()">Reload</button>
+      </div>
+      <p id="gateMsg" class="muted" style="margin-top:.6rem;"></p>
     </div>
   </div>
 
@@ -257,7 +232,7 @@
 
     window.addEventListener("load", () => {
       tickClock(); setInterval(tickClock, 1000);
-      requestLocation();
+      ensureGeoPermission();      // <-- new
       if (TOKEN) showHome(); else showLogin();
       wireDatePicker();
     });
@@ -281,7 +256,7 @@
     }
     function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin(); }
 
-    // -------------------- Clock & location --------------------
+    // -------------------- Clock --------------------
     function tickClock(){
       const now = new Date();
       const hh = now.getHours().toString().padStart(2,"0");
@@ -289,7 +264,32 @@
       document.getElementById("clock").textContent = `${hh}:${mm}`;
     }
 
-    function requestLocation(){
+    // -------------------- Geolocation with auto-retry --------------------
+    async function ensureGeoPermission(){
+      // Use Permissions API where available
+      const gateMsg = document.getElementById("gateMsg");
+      try{
+        if (navigator.permissions && navigator.permissions.query){
+          const status = await navigator.permissions.query({name:"geolocation"});
+          // react immediately and on future changes
+          const apply = () => {
+            if (status.state === "granted") { hideGate(); requestLocation(); }
+            else if (status.state === "prompt") { hideGate(); requestLocation(true); } // will show native prompt
+            else { showGate(); gateMsg.textContent = "Location is blocked for this site. Please allow it in your browser settings, then click Try again."; }
+          };
+          status.onchange = apply;
+          apply();
+        } else {
+          // Older browsers: just try; if denied, fall back to gate
+          requestLocation(true);
+        }
+      }catch(e){
+        // Fallback to simple attempt
+        requestLocation(true);
+      }
+    }
+
+    function requestLocation(spawnPrompt=false){
       navigator.geolocation.getCurrentPosition(async (pos)=>{
         const {latitude, longitude} = pos.coords;
         window.currentCoords = {lat:latitude, lon:longitude};
@@ -297,11 +297,27 @@
         hideGate();
         await prefillLocation(latitude, longitude);
       }, (err)=>{
-        showGate();
-        document.getElementById("weatherBar").textContent = "Location permission required.";
-        console.warn("Geolocation error:", err);
-      });
+        if (err && err.code === err.PERMISSION_DENIED){
+          // If user denied, show gate and wait for them to change site permission.
+          showGate();
+          document.getElementById("gateMsg").textContent = "Permission denied. Allow location for this site, then press Try again.";
+        } else {
+          showGate();
+          document.getElementById("gateMsg").textContent = "Unable to get location. Please try again.";
+        }
+      }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
     }
+
+    function openHelp(){
+      // Open helpful docs based on browser (best-effort)
+      const ua = navigator.userAgent.toLowerCase();
+      let url = "https://support.google.com/chrome/answer/142065?hl=en"; // default: Chrome help
+      if (ua.includes("firefox")) url = "https://support.mozilla.org/en-US/kb/site-permissions";
+      else if (ua.includes("safari") && !ua.includes("chrome")) url = "https://support.apple.com/guide/safari/safo40501/mac";
+      else if (ua.includes("edg/")) url = "https://support.microsoft.com/topic/manage-location-permissions-in-microsoft-edge";
+      window.open(url, "_blank");
+    }
+
     async function prefillLocation(lat,lon){
       try{
         const r = await fetch(`/reverse_geocode?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
@@ -316,7 +332,6 @@
     }
     function showGate(){ document.getElementById("gate").style.display="flex"; }
     function hideGate(){ document.getElementById("gate").style.display="none"; }
-    function retryLocation(){ requestLocation(); }
 
     // -------------------- Planner (Create/Edit) --------------------
     function openPlanner(mode="create", ev=null){
@@ -325,7 +340,6 @@
       document.getElementById("plannerTitle").textContent = mode==="edit" ? "Edit Event" : "Plan New Event";
       document.getElementById("eventMsg").textContent = "";
 
-      // Prefill
       document.getElementById("eventName").value = ev?.event_name || "";
       currentDateISO = ev?.date || "";
       document.getElementById("eventDate").value = currentDateISO;
@@ -339,11 +353,11 @@
       }
 
       document.getElementById("planner").style.display = "flex";
-      document.getElementById("app").classList.add("blurred");   // blur background ONLY when modal is open
+      document.getElementById("app").classList.add("blurred");
     }
     function closePlanner(){
       document.getElementById("planner").style.display = "none";
-      document.getElementById("app").classList.remove("blurred"); // unblur
+      document.getElementById("app").classList.remove("blurred");
       document.getElementById("cityOther").classList.add("hidden");
       document.getElementById("cityOther").value="";
     }
@@ -387,7 +401,6 @@
       }
     }
 
-    // Date overlay
     function wireDatePicker(){
       const dateInput = document.getElementById("eventDate");
       dateInput.addEventListener("change", () => {
