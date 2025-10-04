@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NASA_2025 — Prototype</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #121a2b;
+      --muted: #8aa0c6;
+      --text: #e7eefc;
+      --accent: #3aa3ff;
+      --accent-2: #00d4ff;
+      --ok: #41d888;
+      --warn: #ffb020;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 600px at 70% -10%, rgba(58,163,255,.25), transparent 60%) , var(--bg);
+      color: var(--text);
+      display: grid;
+      grid-template-rows: 1fr auto;
+      min-height: 100vh;
+    }
+
+    /* Center stage */
+    .stage {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(680px, 92vw);
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(22px, 3vw, 28px);
+      letter-spacing: .4px;
+    }
+    p.lead {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      padding: 14px 20px;
+      border-radius: 14px;
+      font-weight: 600;
+      font-size: 16px;
+      color: #08121f;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 8px 18px rgba(0, 212, 255, .25);
+      cursor: pointer;
+      transition: transform .06s ease, box-shadow .2s ease, filter .2s ease;
+      width: 100%;
+    }
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    .btn:active { transform: translateY(1px); }
+
+    .row { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 560px) { .row { grid-template-columns: 1fr 1fr; } }
+
+    /* Bottom weather bar */
+    .weather-bar {
+      position: sticky;
+      bottom: 0;
+      width: 100%;
+      background: rgba(10, 16, 30, 0.9);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(6px);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .weather-pill {
+      display: inline-grid;
+      grid-auto-flow: column;
+      gap: 10px;
+      align-items: center;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 8px 12px;
+      border-radius: 999px;
+      color: var(--text);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ok); box-shadow: 0 0 0 2px rgba(65,216,136,.2); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; color: #cfe3ff; }
+    .link { color: var(--accent-2); text-decoration: none; }
+    .link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <!-- MAIN -->
+  <main class="stage" role="main">
+    <section class="card" aria-label="Planner">
+      <h1>NASA_2025 • Event Weather Planner</h1>
+      <p class="lead">
+        Plan months ahead using NASA data (prototype). Click the button below to start planning an event.
+        For now, results are dummy placeholders — we’ll wire them to the Flask API later.
+      </p>
+
+      <div class="row" style="margin-top: 12px;">
+        <button id="planBtn" class="btn">Plan an event</button>
+      </div>
+
+      <!-- Result block -->
+      <div id="result" style="margin-top:18px; display:none;">
+        <h2 style="margin:0 0 8px; font-size:18px;">Draft plan</h2>
+        <div id="resultBody" class="mono" style="white-space:pre-wrap;"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- WEATHER FOOTER -->
+  <footer id="weatherBar" class="weather-bar" aria-live="polite">
+    <div>
+      <span style="font-weight:600; color:#dce9ff;">Local weather</span>
+      <span id="wxStatus" class="mono">… locating</span>
+    </div>
+    <div class="weather-pill" title="Connection status">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="mono">API: mock</span>
+    </div>
+  </footer>
+
+  <script>
+    // ---------------------------
+    // Simple state & helpers
+    // ---------------------------
+    const $ = (sel) => document.querySelector(sel);
+    const planBtn = $('#planBtn');
+    const result = $('#result');
+    const resultBody = $('#resultBody');
+    const wxStatus = $('#wxStatus');
+
+    // Formatting helpers
+    const fmtPct = (x) => `${Math.round(x * 100)}%`;
+    const fmtTemp = (c) => `${c.toFixed(1)}°C`;
+
+    // ---------------------------
+    // Dummy "Plan an event" flow
+    // ---------------------------
+    planBtn.addEventListener('click', async () => {
+      // In the real app, you’d open a date/location picker here and call your Flask API.
+      // For now we simulate a response.
+      result.style.display = 'block';
+      resultBody.textContent = 'Querying NASA datasets…\n';
+
+      // Fake latency
+      await new Promise(r => setTimeout(r, 600));
+
+      // Dummy response payload (shape similar to your future API)
+      const payload = {
+        input: {
+          date: '2025-06-07',
+          location: { name: 'Your chosen spot', lat: window.__lat ?? 1.2903, lon: window.__lon ?? 103.8519 }
+        },
+        summary: {
+          rain_probability: 0.42,
+          avg_temp_c: 26.2,
+          extreme_heat_probability: 0.10,
+          note: 'Consider an umbrella and extra ice for desserts.'
+        }
+      };
+
+      const text =
+`Date: ${payload.input.date}
+Location: ${payload.input.location.name} (${payload.input.location.lat.toFixed(4)}, ${payload.input.location.lon.toFixed(4)})
+
+• Chance of rain: ${fmtPct(payload.summary.rain_probability)}
+• Average daytime temperature: ${fmtTemp(payload.summary.avg_temp_c)}
+• Heatwave risk: ${fmtPct(payload.summary.extreme_heat_probability)}
+
+Suggestion: ${payload.summary.note}`;
+
+      resultBody.textContent = text;
+    });
+
+    // ---------------------------
+    // Bottom weather (mock)
+    // ---------------------------
+    // We’ll attempt to get the user’s coordinates so we can show them in the footer.
+    // Weather values are dummy for now; later, call your Flask endpoint or a weather API.
+    function setWeatherText(txt) { wxStatus.textContent = `— ${txt}`; }
+
+    function setDummyWeather(lat, lon) {
+      // Dummy logic: temp depends a tiny bit on lat; condition rotates by minutes.
+      const m = new Date().getMinutes();
+      const conditions = ['Clear', 'Partly cloudy', 'Overcast', 'Light rain'];
+      const cond = conditions[m % conditions.length];
+      const temp = 27 + Math.sin((lat || 0) / 30) * 2; // silly variation
+      setWeatherText(`${cond}, ${fmtTemp(temp)} @ ${lat?.toFixed?.(3) ?? '?.???'}, ${lon?.toFixed?.(3) ?? '?.???'}`);
+    }
+
+    function geolocate() {
+      if (!navigator.geolocation) {
+        setWeatherText('Geolocation unavailable — using mock data.');
+        setDummyWeather(null, null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          window.__lat = latitude;
+          window.__lon = longitude;
+          setDummyWeather(latitude, longitude);
+        },
+        () => {
+          setWeatherText('Location blocked — using mock coordinates.');
+          setDummyWeather(1.2903, 103.8519); // mock: Singapore
+        },
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+      );
+    }
+
+    geolocate();
+
+    // ---------------------------
+    // (Optional) Future hooks
+    // ---------------------------
+    // Example: calling your Flask API later
+    // async function fetchProbabilities(lat, lon, date) {
+    //   const url = `http://localhost:8000/probability?lat=${lat}&lon=${lon}&date=${date}`;
+    //   const res = await fetch(url);
+    //   if (!res.ok) throw new Error('API error');
+    //   return res.json();
+    // }
+  </script>
+</body>
+</html>

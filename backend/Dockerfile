@@ -4,7 +4,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# copy app and static site
 COPY app.py .
+COPY static ./static
 
-# Run with Gunicorn, default 4 workers (can override via env)
+# Gunicorn entrypoint (multi-worker)
 CMD ["sh", "-c", "gunicorn -w ${GUNICORN_WORKERS:-4} -b 0.0.0.0:8000 app:app"]

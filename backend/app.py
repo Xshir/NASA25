@@ -1,19 +1,20 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import os
 import psycopg2
 from psycopg2 import pool
 
-# -----------------------------
+# -----------------------------------------------------------------------------
 # Flask app
-# -----------------------------
-app = Flask(__name__)
+# -----------------------------------------------------------------------------
+app = Flask(__name__, static_folder="static")
 
-# -----------------------------
-# DB connection pool
-# -----------------------------
+# -----------------------------------------------------------------------------
+# DB connection pool (psycopg2, per-gunicorn-worker)
+# -----------------------------------------------------------------------------
 db_pool: pool.SimpleConnectionPool | None = None
 
 def init_db_pool():
+    """Create a small connection pool if it doesn't exist yet."""
     global db_pool
     if db_pool is None:
         db_url = os.getenv("DATABASE_URL")
@@ -25,24 +26,29 @@ def init_db_pool():
             dsn=db_url
         )
 
-# initialize pool at import so each Gunicorn worker has it
+# Initialize at import time so each Gunicorn worker has its own pool
 init_db_pool()
 
-# safety: ensure pool exists even if something resets
 @app.before_request
 def _ensure_pool():
+    # Safety: recreate pool if it was ever cleared
     if db_pool is None:
         init_db_pool()
 
-# -----------------------------
-# Routes
-# -----------------------------
+# -----------------------------------------------------------------------------
+# Static site (served from backend/static/index.html)
+# -----------------------------------------------------------------------------
 @app.route("/")
-def home():
-    return "NASA_2025 API is running"
+def index():
+    # Make sure backend/static/index.html exists
+    return send_from_directory(app.static_folder, "index.html")
 
+# -----------------------------------------------------------------------------
+# Health / diagnostics
+# -----------------------------------------------------------------------------
 @app.route("/db-check")
 def db_check():
+    """Confirm DB + PostGIS are reachable."""
     try:
         conn = db_pool.getconn()
         cur = conn.cursor()
@@ -54,19 +60,31 @@ def db_check():
     except Exception as e:
         return f"DB error: {e}", 500
 
+# -----------------------------------------------------------------------------
+# Locations API (minimal demo)
+# -----------------------------------------------------------------------------
 @app.route("/add-location", methods=["POST"])
 def add_location():
+    """
+    JSON body:
+    {
+      "name": "Singapore Botanic Gardens",
+      "lat": 1.3138,
+      "lon": 103.8159
+    }
+    """
     data = request.get_json(silent=True) or {}
     name = data.get("name")
     lat = data.get("lat")
     lon = data.get("lon")
+
     if name is None or lat is None or lon is None:
         return jsonify({"error": "name, lat, and lon are required"}), 400
 
     try:
         conn = db_pool.getconn()
         cur = conn.cursor()
-        # NOTE: order is lon, lat
+        # NOTE: PostGIS POINT expects (lon, lat)
         cur.execute(
             """
             INSERT INTO locations (name, geom)
@@ -80,11 +98,14 @@ def add_location():
         cur.close()
         db_pool.putconn(conn)
         return jsonify({"id": new_id, "name": name, "lat": lat, "lon": lon}), 201
+
     except Exception as e:
+        # Return a simple message (avoid leaking internals)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/locations", methods=["GET"])
 def get_locations():
+    """List all stored locations with lat/lon extracted from PostGIS geography."""
     try:
         conn = db_pool.getconn()
         cur = conn.cursor()
@@ -99,14 +120,18 @@ def get_locations():
         cur.close()
         db_pool.putconn(conn)
 
-        results = [{"id": r[0], "name": r[1], "lat": float(r[2]), "lon": float(r[3])} for r in rows]
+        results = [
+            {"id": r[0], "name": r[1], "lat": float(r[2]), "lon": float(r[3])}
+            for r in rows
+        ]
         return jsonify(results)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# -----------------------------
-# Local dev entrypoint
-# -----------------------------
+# -----------------------------------------------------------------------------
+# Local dev entrypoint (not used with Gunicorn in Docker, but handy if needed)
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     if db_pool is None:
         init_db_pool()
