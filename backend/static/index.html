@@ -5,259 +5,477 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NASA_2025 — Event Weather Planner</title>
   <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #0b0c10 0%, #1f2833 100%);
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: start;
-      height: 100vh;
-      margin: 0;
-      padding: 1.5rem;
+    :root{
+      --bg1:#07090e; --bg2:#0f1624;
+      --panel:#121a27; --panel-2:#1b2636;
+      --teal:#66fcf1; --mint:#45a29e;
+      --muted:#b7c3dc; --stroke:#2d3a4d; --accent:#2b3442;
     }
-    h1 { margin-bottom: 0.3rem; color: #66fcf1; }
-    h2 { color: #45a29e; margin-top: 1.2rem; }
-    input, button {
-      padding: 0.6rem;
-      border-radius: 6px;
-      border: none;
-      margin: 0.3rem 0;
-      font-size: 1rem;
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+      margin:0; color:#eaf5ff;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #0a1930 0%, transparent 60%),
+        radial-gradient(1000px 500px at 90% 110%, #08212f 0%, transparent 55%),
+        linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
     }
-    input { width: 100%; max-width: 320px; }
-    button {
-      cursor: pointer;
-      background-color: #45a29e;
-      color: #0b0c10;
-      font-weight: 600;
+
+    /* ---- App wrapper (blur target) ---- */
+    #app{
+      min-height:100dvh;
+      display:flex; flex-direction:column; align-items:center;
+      padding:24px 16px 72px;
+      transition:filter .25s ease, opacity .25s ease;
     }
-    button:hover { background-color: #66fcf1; }
-    .card {
-      background: #1f2833;
-      border-radius: 10px;
-      padding: 1.5rem 1.8rem;
-      margin: 1rem 0;
-      width: 100%;
-      max-width: 460px;
-      box-shadow: 0 0 12px rgba(102, 252, 241, 0.3);
+    #app.blurred{ filter:blur(12px) saturate(85%) brightness(.85); }
+
+    h1{color:var(--teal); margin:.2rem 0 .3rem; letter-spacing:.4px}
+    h2{color:var(--mint); margin:1rem 0 .6rem}
+    .muted{color:var(--muted)}
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.06);
+      backdrop-filter: blur(6px);
+      width:min(95vw,760px);
+      border-radius:14px; padding:18px 20px; margin:12px 0;
+      box-shadow:0 12px 36px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.02);
+      transition:transform .05s ease;
     }
-    .hidden { display: none; }
-    .list { margin-top: .5rem; }
-    .list-item {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: .6rem; padding: .6rem .4rem; border-bottom: 1px solid #2b3442;
+    .card:active{transform:translateY(1px)}
+    .hidden{display:none}
+
+    /* ---- Header strip ---- */
+    .header{
+      display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center;
+      padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
     }
-    .list-item button {
-      padding: .4rem .6rem; font-size: .9rem;
+    .time{font-size:1.25rem; font-weight:700}
+    .loc{font-size:.95rem; color:var(--muted)}
+    .wx{font-size:.95rem; opacity:.9}
+
+    /* ---- Buttons ---- */
+    .btn{
+      padding:.55rem .9rem; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem;
+      transition:transform .05s ease, background .2s ease, box-shadow .2s ease;
+      box-shadow:none; /* no permanent glow */
     }
-    #weatherBar {
-      position: fixed;
-      bottom: 0;
-      width: 100%;
-      text-align: center;
-      padding: 0.8rem;
-      background: rgba(31, 40, 51, 0.95);
-      border-top: 1px solid #45a29e;
-      font-size: 0.9rem;
+    .btn:active{transform:translateY(1px)}
+    .btn-primary{background:var(--mint); color:#0b0c10;}
+    .btn-primary:hover{background:var(--teal); box-shadow:0 10px 24px rgba(102,252,241,.25);} /* hover glow only */
+    .btn-ghost{background:#223043; color:#e6f7f6; border:1px solid var(--stroke)}
+    .btn-ghost:hover{background:#2a3b53; box-shadow:0 10px 24px rgba(0,0,0,.25);} /* hover glow only */
+
+    /* ---- Events list ---- */
+    .list{margin-top:.5rem}
+    .item{
+      display:grid; grid-template-columns:1fr auto; gap:.6rem; align-items:center;
+      padding:.7rem .35rem; border-bottom:1px solid rgba(255,255,255,.06);
     }
-    #logoutBtn { margin-top: 1rem; background-color: #c0392b; color: #fff; }
-    #logoutBtn:hover { background-color: #e74c3c; }
-    ul.tips { padding-left: 1.2rem; }
-    ul.tips li { margin: .25rem 0; }
-    .muted { color:#a8b3d1; font-size:.95rem; }
+    .item-title{font-weight:700; letter-spacing:.2px}
+    .item-sub{color:var(--muted); font-size:.95rem}
+    .btn-row{display:flex; gap:.45rem}
+
+    /* ---- Modal / Planner ---- */
+    .modal{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1000;
+      background:rgba(9,14,22,.55); /* dim layer */
+      animation:fadeIn .18s ease;
+    }
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .sheet{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px; width:min(92vw,560px); padding:18px;
+      box-shadow:0 20px 60px rgba(0,0,0,.5);
+    }
+    .row{display:grid; gap:.9rem}
+    .row-2{grid-template-columns:1fr 1fr}
+    label{font-size:.92rem; color:var(--muted); display:block; margin:.2rem 0 .35rem}
+    input,select{
+      width:100%; padding:.65rem .75rem; border:1px solid var(--stroke); border-radius:10px;
+      background:#0f1928; color:#fff; font-size:1rem; outline:none;
+      box-shadow:0 3px 0 rgba(0,0,0,.25) inset;
+    }
+
+    /* Date control */
+    .date-line{display:flex; align-items:center; gap:.8rem}
+    .date-label{min-width:150px; color:var(--muted)}
+    .date-wrap{position:relative; width:46px; height:46px}
+    .icon-btn{
+      width:46px; height:46px; border-radius:12px; background:#213247; border:1px solid var(--stroke);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .icon-btn:hover{background:#2a3b53}
+    .date-overlay{position:absolute; inset:0; opacity:0; cursor:pointer}
+    .calendar-emoji{font-size:20px}
+
+    #cityOther{margin-top:.4rem}
+
+    /* Gate & bottom bar */
+    #gate{position:fixed; inset:0; background:rgba(5,10,18,.92); display:none; align-items:center; justify-content:center; z-index:1500}
+    #gate .panel{background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,420px)}
+    #weatherBar{position:fixed; bottom:0; left:0; right:0; text-align:center; padding:.55rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(18,27,41,.92); font-size:.92rem}
   </style>
 </head>
 <body>
-  <h1>NASA_2025</h1>
-  <p class="muted">Plan your perfect event — powered by NASA & Meteomatics</p>
+  <div id="app">
+    <h1>NASA_2025</h1>
+    <p class="muted" style="margin-top:-2px;">Plan your perfect event — powered by NASA & Meteomatics</p>
 
-  <!-- LOGIN PAGE -->
-  <div id="loginCard" class="card">
-    <h2>Login</h2>
-    <input id="loginUsername" placeholder="Username" autocomplete="off" />
-    <input id="loginPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
-    <button onclick="login()">Login</button>
-    <p id="loginMsg"></p>
-    <p>Don’t have an account? <a href="#" onclick="showSignup()">Sign up</a></p>
+    <!-- LOGIN -->
+    <div id="loginCard" class="card">
+      <h2>Login</h2>
+      <div class="row">
+        <input id="loginUsername" placeholder="Username" autocomplete="off" />
+        <input id="loginPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
+        <button class="btn btn-primary" onclick="login()">Login</button>
+        <p id="loginMsg"></p>
+        <p class="muted">Don’t have an account? <a href="#" onclick="showSignup()" style="color:var(--teal); text-decoration:none">Sign up</a></p>
+      </div>
+    </div>
+
+    <!-- SIGNUP -->
+    <div id="signupCard" class="card hidden">
+      <h2>Sign Up</h2>
+      <div class="row">
+        <input id="signupUsername" placeholder="Choose username" autocomplete="off" />
+        <input id="signupPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
+        <button class="btn btn-primary" onclick="signup()">Create Account</button>
+        <p id="signupMsg"></p>
+        <p class="muted">Already have an account? <a href="#" onclick="showLogin()" style="color:var(--teal); text-decoration:none">Login</a></p>
+      </div>
+    </div>
+
+    <!-- HOME -->
+    <div id="homeCard" class="card hidden">
+      <div class="header">
+        <div>
+          <div class="time" id="clock">--:--</div>
+          <div class="loc" id="locLine">Locating…</div>
+        </div>
+        <div class="wx" id="wxNow">Weather: (coming soon)</div>
+        <!-- Plan button beside weather (only primary persistent button) -->
+        <button class="btn btn-primary" onclick="openPlanner('create')">Plan</button>
+      </div>
+
+      <h2 style="margin-top:1rem;">Upcoming Events</h2>
+      <div id="eventsList" class="list"></div>
+
+      <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <!-- EVENT DETAILS -->
+    <div id="eventCard" class="card hidden">
+      <button onclick="showHome()" class="btn btn-ghost" style="float:right;">← Back</button>
+      <h2 id="eventTitle">Event</h2>
+      <p id="eventSub" class="muted">Date & Location</p>
+      <h3>Suggested prep</h3>
+      <p id="eventHeadline" style="margin:.2rem 0 .6rem;"></p>
+      <ul id="eventTips"></ul>
+      <p class="muted" id="eventNote"></p>
+    </div>
   </div>
 
-  <!-- SIGNUP PAGE -->
-  <div id="signupCard" class="card hidden">
-    <h2>Sign Up</h2>
-    <input id="signupUsername" placeholder="Choose username" autocomplete="off" />
-    <input id="signupPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
-    <button onclick="signup()">Create Account</button>
-    <p id="signupMsg"></p>
-    <p>Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
+  <!-- Planner modal -->
+  <div id="planner" class="modal">
+    <div class="sheet">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 id="plannerTitle">Plan New Event</h2>
+        <button class="btn btn-ghost" onclick="closePlanner()">✕</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="eventName">Event name</label>
+          <input id="eventName" />
+        </div>
+
+        <div>
+          <label>Date</label>
+          <div class="date-line">
+            <span class="date-label" id="dateLabel">No date selected</span>
+            <div class="date-wrap">
+              <button class="icon-btn" title="Pick date"><span class="calendar-emoji">📅</span></button>
+              <input id="eventDate" type="date" class="date-overlay" />
+            </div>
+          </div>
+        </div>
+
+        <div class="row row-2">
+          <div>
+            <label for="countrySelect">Country</label>
+            <select id="countrySelect"></select>
+          </div>
+          <div>
+            <label for="citySelect">City</label>
+            <select id="citySelect"></select>
+            <input id="cityOther" class="hidden" placeholder="Enter city" />
+          </div>
+        </div>
+
+        <div style="display:flex; gap:.6rem; justify-content:flex-end; margin-top:.4rem;">
+          <button class="btn btn-ghost" onclick="closePlanner()">Cancel</button>
+          <button id="saveBtn" class="btn btn-primary" onclick="saveEvent()">Save</button>
+        </div>
+
+        <p id="eventMsg"></p>
+      </div>
+    </div>
   </div>
 
-  <!-- MAIN DASHBOARD -->
-  <div id="mainCard" class="card hidden">
-    <h2>Create Event</h2>
-    <input id="eventName" placeholder="Event name (e.g., Picnic, Flying Drone)" />
-    <input id="eventDate" type="date" />
-    <input id="eventCity" placeholder="City (auto-detected or type manually)" />
-    <button onclick="planEvent()">Plan Event</button>
-    <p id="eventMsg"></p>
-
-    <h2>Your Events</h2>
-    <div id="eventsList" class="list"></div>
-
-    <button id="logoutBtn" onclick="logout()">Logout</button>
+  <!-- Location gate & bottom bar -->
+  <div id="gate">
+    <div class="panel">
+      <h2>Location required</h2>
+      <p class="muted">We use your location to tailor weather guidance. Please allow location access to continue.</p>
+      <button class="btn btn-primary" onclick="retryLocation()">Try Again</button>
+    </div>
   </div>
 
-  <!-- EVENT DETAILS PAGE -->
-  <div id="eventCard" class="card hidden">
-    <button onclick="showMain()" style="float:right;">← Back</button>
-    <h2 id="eventTitle">Event</h2>
-    <p id="eventSub" class="muted">Date & Location</p>
-    <h3>Suggested prep</h3>
-    <p id="eventHeadline" style="margin:.2rem 0 0.6rem;"></p>
-    <ul id="eventTips" class="tips"></ul>
-    <p class="muted" id="eventNote"></p>
-  </div>
-
-  <div id="weatherBar">Detecting location & weather...</div>
+  <div id="weatherBar">Requesting location permission…</div>
 
   <script>
+    // -------------------- Global & Router --------------------
     const API_BASE = "";
     let TOKEN = localStorage.getItem("token") || null;
+    let currentDateISO = "";
+    let plannerMode = "create"; // or "edit"
+    let editingId = null;
 
-    // Simple router helpers
-    function hideAll() { document.querySelectorAll(".card").forEach(c => c.classList.add("hidden")); }
-    function showLogin()  { hideAll(); document.getElementById("loginCard").classList.remove("hidden"); }
-    function showSignup() { hideAll(); document.getElementById("signupCard").classList.remove("hidden"); }
-    function showMain()   { hideAll(); document.getElementById("mainCard").classList.remove("hidden"); fetchEvents(); }
-    function showEvent()  { hideAll(); document.getElementById("eventCard").classList.remove("hidden"); }
+    function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")); }
+    function showLogin(){ hideAll(); document.getElementById("loginCard").classList.remove("hidden"); }
+    function showSignup(){ hideAll(); document.getElementById("signupCard").classList.remove("hidden"); }
+    function showHome(){ hideAll(); document.getElementById("homeCard").classList.remove("hidden"); fetchEvents(); }
+    function showEvent(){ hideAll(); document.getElementById("eventCard").classList.remove("hidden"); }
 
     window.addEventListener("load", () => {
-      if (TOKEN) showMain(); else showLogin();
-      getWeatherBar();
+      tickClock(); setInterval(tickClock, 1000);
+      requestLocation();
+      if (TOKEN) showHome(); else showLogin();
+      wireDatePicker();
     });
 
-    // ---------------- AUTH ----------------
-    async function signup() {
+    // -------------------- Auth --------------------
+    async function signup(){
       const username = document.getElementById("signupUsername").value.trim().toLowerCase();
       const pin = document.getElementById("signupPin").value.trim();
-      const res = await fetch(`${API_BASE}/signup`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, pin }),
-      });
-      const data = await res.json();
-      if (data.ok) { TOKEN = data.token; localStorage.setItem("token", TOKEN); showMain(); }
-      else { document.getElementById("signupMsg").textContent = data.error || "Signup failed"; }
+      const r = await fetch(`${API_BASE}/signup`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
+      const data = await r.json();
+      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); showHome(); }
+      else document.getElementById("signupMsg").textContent=data.error||"Signup failed";
     }
-
-    async function login() {
+    async function login(){
       const username = document.getElementById("loginUsername").value.trim().toLowerCase();
       const pin = document.getElementById("loginPin").value.trim();
-      const res = await fetch(`${API_BASE}/login`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, pin }),
-      });
-      const data = await res.json();
-      if (data.ok) { TOKEN = data.token; localStorage.setItem("token", TOKEN); showMain(); }
-      else { document.getElementById("loginMsg").textContent = data.error || "Login failed"; }
+      const r = await fetch(`${API_BASE}/login`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
+      const data = await r.json();
+      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); showHome(); }
+      else document.getElementById("loginMsg").textContent=data.error||"Login failed";
+    }
+    function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin(); }
+
+    // -------------------- Clock & location --------------------
+    function tickClock(){
+      const now = new Date();
+      const hh = now.getHours().toString().padStart(2,"0");
+      const mm = now.getMinutes().toString().padStart(2,"0");
+      document.getElementById("clock").textContent = `${hh}:${mm}`;
     }
 
-    function logout() { TOKEN = null; localStorage.removeItem("token"); showLogin(); }
+    function requestLocation(){
+      navigator.geolocation.getCurrentPosition(async (pos)=>{
+        const {latitude, longitude} = pos.coords;
+        window.currentCoords = {lat:latitude, lon:longitude};
+        document.getElementById("weatherBar").textContent = `Location: (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
+        hideGate();
+        await prefillLocation(latitude, longitude);
+      }, (err)=>{
+        showGate();
+        document.getElementById("weatherBar").textContent = "Location permission required.";
+        console.warn("Geolocation error:", err);
+      });
+    }
+    async function prefillLocation(lat,lon){
+      try{
+        const r = await fetch(`/reverse_geocode?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+        const data = await r.json();
+        const loc = [data.city, data.country].filter(Boolean).join(", ");
+        document.getElementById("locLine").textContent = loc || "Location detected";
+        populateCountry(data.country||"");
+        populateCity(data.city||"");
+      }catch(e){
+        populateCountry(""); populateCity("");
+      }
+    }
+    function showGate(){ document.getElementById("gate").style.display="flex"; }
+    function hideGate(){ document.getElementById("gate").style.display="none"; }
+    function retryLocation(){ requestLocation(); }
 
-    // ------------- EVENTS (list + create) -------------
-    async function planEvent() {
+    // -------------------- Planner (Create/Edit) --------------------
+    function openPlanner(mode="create", ev=null){
+      plannerMode = mode;
+      editingId = ev?.id ?? null;
+      document.getElementById("plannerTitle").textContent = mode==="edit" ? "Edit Event" : "Plan New Event";
+      document.getElementById("eventMsg").textContent = "";
+
+      // Prefill
+      document.getElementById("eventName").value = ev?.event_name || "";
+      currentDateISO = ev?.date || "";
+      document.getElementById("eventDate").value = currentDateISO;
+      setDateLabel(currentDateISO);
+
+      populateCity(ev?.city || document.getElementById("citySelect").value);
+      if (ev?.city) {
+        const sel = document.getElementById("citySelect");
+        let found=false; [...sel.options].forEach(o=>{ if(o.value===ev.city){ o.selected=true; found=true; }});
+        if(!found){ sel.value="__OTHER__"; document.getElementById("cityOther").classList.remove("hidden"); document.getElementById("cityOther").value = ev.city; }
+      }
+
+      document.getElementById("planner").style.display = "flex";
+      document.getElementById("app").classList.add("blurred");   // blur background ONLY when modal is open
+    }
+    function closePlanner(){
+      document.getElementById("planner").style.display = "none";
+      document.getElementById("app").classList.remove("blurred"); // unblur
+      document.getElementById("cityOther").classList.add("hidden");
+      document.getElementById("cityOther").value="";
+    }
+
+    async function saveEvent(){
       const name = document.getElementById("eventName").value.trim();
-      const date = document.getElementById("eventDate").value;
-      const city = document.getElementById("eventCity").value.trim();
+      const date = currentDateISO || document.getElementById("eventDate").value;
+      const city = chosenCity();
       const msg = document.getElementById("eventMsg");
+      if(!name || !date || !city){ msg.textContent="Please provide event name, date, and city."; return; }
 
-      if (!name || !date) { msg.textContent = "Enter event name and date"; return; }
+      const body = { event_name:name, city, date };
+      if (window.currentCoords) { body.lat=window.currentCoords.lat; body.lon=window.currentCoords.lon; }
 
-      msg.textContent = "Saving…";
-      const body = { event_name: name, city, date };
-      if (window.currentCoords) { body.lat = window.currentCoords.lat; body.lon = window.currentCoords.lon; }
-
-      try {
-        const res = await fetch(`${API_BASE}/events`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (res.ok && data.id) {
-          msg.textContent = "Event added ✅";
-          document.getElementById("eventName").value = "";
-          document.getElementById("eventDate").value = "";
-          await fetchEvents();
+      try{
+        let r, data;
+        if (plannerMode === "edit" && editingId){
+          r = await fetch(`/events/${editingId}`, {
+            method:"PUT",
+            headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` },
+            body: JSON.stringify(body)
+          });
+          data = await r.json();
+          if(!r.ok) throw new Error(data.error||"Update failed");
+          closePlanner();
+          await openEventDetails({ id: editingId, event_name:name, city, date });
         } else {
-          msg.textContent = "Error: " + (data.error || "Unknown");
-          console.error("create failed:", data);
+          r = await fetch(`/events`, {
+            method:"POST",
+            headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` },
+            body: JSON.stringify(body)
+          });
+          data = await r.json();
+          if(!r.ok) throw new Error(data.error||"Create failed");
+          closePlanner();
+          await openEventDetails(data);
         }
-      } catch (e) {
-        msg.textContent = "Network error";
-        console.error(e);
+        await fetchEvents();
+      }catch(e){
+        msg.textContent = "Error: " + e.message;
       }
     }
 
-    async function fetchEvents() {
-      const res = await fetch(`${API_BASE}/events`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-      const data = await res.json();
+    // Date overlay
+    function wireDatePicker(){
+      const dateInput = document.getElementById("eventDate");
+      dateInput.addEventListener("change", () => {
+        currentDateISO = dateInput.value;
+        setDateLabel(currentDateISO);
+      });
+    }
+    function setDateLabel(iso){
+      const label = document.getElementById("dateLabel");
+      if(!iso){ label.textContent = "No date selected"; return; }
+      const d = new Date(iso + "T00:00:00");
+      const day = d.getDate().toString().padStart(2,"0");
+      const mo  = d.toLocaleString(undefined,{month:"short"});
+      const yr  = d.getFullYear();
+      label.textContent = `${day} ${mo} ${yr}`;
+    }
+
+    // -------------------- Country / City --------------------
+    const COUNTRIES = [
+      "Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","India","China","Japan","South Korea",
+      "Australia","New Zealand","United States","Canada","United Kingdom","Germany","France","Spain","Italy","Netherlands"
+    ];
+    function populateCountry(selected){
+      const sel = document.getElementById("countrySelect");
+      sel.innerHTML = "";
+      const list = [...COUNTRIES];
+      if(selected && !list.includes(selected)) list.unshift(selected);
+      list.forEach(c=>{
+        const o=document.createElement("option"); o.value=c; o.textContent=c; if(c===selected) o.selected=true; sel.appendChild(o);
+      });
+    }
+    function populateCity(detected){
+      const citySel = document.getElementById("citySelect");
+      const cityOther = document.getElementById("cityOther");
+      citySel.innerHTML = "";
+      if(detected){
+        const od = document.createElement("option");
+        od.value=detected; od.textContent=`${detected}`; citySel.appendChild(od); citySel.value=detected;
+      } else {
+        const o0=document.createElement("option"); o0.value=""; o0.textContent="Select city…"; o0.disabled=true; o0.selected=true; citySel.appendChild(o0);
+      }
+      const oOther=document.createElement("option"); oOther.value="__OTHER__"; oOther.textContent="Other city…"; citySel.appendChild(oOther);
+      cityOther.classList.add("hidden");
+      citySel.onchange = ()=> {
+        if(citySel.value==="__OTHER__") cityOther.classList.remove("hidden");
+        else { cityOther.classList.add("hidden"); cityOther.value=""; }
+      };
+    }
+    function chosenCity(){
+      const sel = document.getElementById("citySelect");
+      return sel.value==="__OTHER__" ? document.getElementById("cityOther").value.trim() : sel.value;
+    }
+
+    // -------------------- Events --------------------
+    async function fetchEvents(){
+      const r = await fetch(`/events`, {headers:{Authorization:`Bearer ${TOKEN}`}});
+      const data = await r.json();
       const list = document.getElementById("eventsList");
       list.innerHTML = "";
-      if (!Array.isArray(data) || data.length === 0) {
-        list.textContent = "No events yet.";
+      if(!Array.isArray(data) || data.length===0){
+        list.innerHTML = `<div class="muted">No events yet — use the <b>Plan</b> button above.</div>`;
         return;
       }
-      data.forEach(e => {
-        const row = document.createElement("div");
-        row.className = "list-item";
-        const title = document.createElement("div");
-        title.textContent = `${e.event_name} — ${e.date}`;
-        const btn = document.createElement("button");
-        btn.textContent = "View";
-        btn.onclick = () => openEventDetails(e);
-        row.appendChild(title);
-        row.appendChild(btn);
-        list.appendChild(row);
+      data.forEach(e=>{
+        const row=document.createElement("div"); row.className="item";
+        const left=document.createElement("div");
+        left.innerHTML=`<div class="item-title">${e.event_name}</div><div class="item-sub">${e.date}${e.city? " • "+e.city:""}</div>`;
+        const btns=document.createElement("div"); btns.className="btn-row";
+        const b1=document.createElement("button"); b1.className="btn btn-primary"; b1.textContent="View"; b1.onclick=()=>openEventDetails(e);
+        const b2=document.createElement("button"); b2.className="btn btn-ghost"; b2.textContent="Edit"; b2.onclick=()=>openPlanner('edit', e);
+        btns.appendChild(b1); btns.appendChild(b2);
+        row.appendChild(left); row.appendChild(btns); list.appendChild(row);
       });
     }
 
-    // --------- EVENT DETAILS (separate screen) ---------
-    async function openEventDetails(e) {
-      // Fill header
+    async function openEventDetails(e){
       document.getElementById("eventTitle").textContent = e.event_name;
       document.getElementById("eventSub").textContent = `${e.date}${e.city ? " • " + e.city : ""}`;
-      // Fetch suggestions for this event
-      const res = await fetch(`${API_BASE}/suggest`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
-        body: JSON.stringify({ event_name: e.event_name, date: e.date, lat: e.lat, lon: e.lon }),
-      });
-      const data = await res.json();
-      document.getElementById("eventHeadline").textContent = `Predicted weather: ${data.predicted || "—"}`;
-      const tips = document.getElementById("eventTips"); tips.innerHTML = "";
-      (data.advice || []).forEach(t => {
-        const li = document.createElement("li"); li.textContent = t; tips.appendChild(li);
-      });
-      document.getElementById("eventNote").textContent = data.note || "";
-      // Show screen
-      showEvent();
-    }
 
-    // ---------------- WEATHER BAR ----------------
-    async function getWeatherBar() {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          window.currentCoords = { lat: latitude, lon: longitude };
-          document.getElementById("weatherBar").textContent =
-            `Location: (${latitude.toFixed(2)}, ${longitude.toFixed(2)}) — live weather to be added`;
-        },
-        () => {
-          document.getElementById("weatherBar").textContent =
-            "Location access denied — please type your city manually.";
-        }
-      );
+      const body = e.id ? {event_id:e.id} : {event_name:e.event_name, date:e.date, lat:e.lat, lon:e.lon};
+      const r = await fetch(`/suggest`, {method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${TOKEN}`}, body:JSON.stringify(body)});
+      const data = await r.json();
+
+      document.getElementById("eventHeadline").textContent = `Predicted weather: ${data.predicted || "—"}`;
+      const tips = document.getElementById("eventTips"); tips.innerHTML="";
+      (data.advice||[]).forEach(t=>{ const li=document.createElement("li"); li.textContent=t; tips.appendChild(li); });
+      document.getElementById("eventNote").textContent = data.note || "";
+      showEvent();
     }
   </script>
 </body>
