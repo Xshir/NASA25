@@ -28,89 +28,67 @@ def init_db_pool():
         ensure_schema()  # auto-migrate on startup
 
 def ensure_schema():
-    """Ensure tables exist; clean up orphaned sequences from previous runs."""
+    """Run idempotent schema setup under an advisory lock to avoid worker races."""
     conn = db_pool.getconn()
+    conn.autocommit = False
     cur = conn.cursor()
 
-    # Helper: does a table exist?
-    def table_exists(name: str) -> bool:
+    # Take a cluster-wide advisory lock (choose any big int; keep it constant)
+    cur.execute("SELECT pg_advisory_lock(865042025);")
+    try:
+        # Tables (IDENTITY is fine; the lock prevents sequence collisions)
         cur.execute("""
-            SELECT 1 FROM information_schema.tables
-            WHERE table_schema = 'public' AND table_name = %s
-        """, (name,))
-        return cur.fetchone() is not None
+            CREATE TABLE IF NOT EXISTS locations (
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                name TEXT,
+                geom GEOGRAPHY(POINT, 4326),
+                event TEXT,
+                event_date DATE
+            );
+        """)
 
-    # Helper: drop a sequence only if it exists AND the table doesn't exist
-    def drop_seq_if_orphan(table: str, seq: str):
-        if not table_exists(table):
-            cur.execute("""
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1
-                        FROM pg_class c
-                        JOIN pg_namespace n ON n.oid = c.relnamespace
-                        WHERE c.relkind = 'S' AND c.relname = %s AND n.nspname = 'public'
-                    ) THEN
-                        EXECUTE 'DROP SEQUENCE IF EXISTS ' || quote_ident(%s) || ' CASCADE';
-                    END IF;
-                END $$;
-            """, (seq, seq))
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS app_users (
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                pin_hash TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+        """)
 
-    # Clean possible orphans from earlier crashes
-    drop_seq_if_orphan('locations',   'locations_id_seq')
-    drop_seq_if_orphan('app_users',   'app_users_id_seq')
-    drop_seq_if_orphan('app_sessions','app_sessions_token_seq')  # unlikely, but safe
-    drop_seq_if_orphan('user_events', 'user_events_id_seq')
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS app_sessions (
+                token TEXT PRIMARY KEY,
+                user_id BIGINT REFERENCES app_users(id) ON DELETE CASCADE,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                expires_at TIMESTAMPTZ NOT NULL
+            );
+        """)
 
-    # Base locations (keep for PostGIS geometry)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS locations (
-            id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-            name TEXT,
-            geom GEOGRAPHY(POINT, 4326),
-            event TEXT,
-            event_date DATE
-        );
-    """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_events (
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                user_id BIGINT REFERENCES app_users(id) ON DELETE CASCADE,
+                event_name TEXT NOT NULL,
+                city TEXT,
+                lat DOUBLE PRECISION,
+                lon DOUBLE PRECISION,
+                event_date DATE NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+        """)
 
-    # Users (username stored lowercase)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS app_users (
-            id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            pin_hash TEXT NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
+        conn.commit()
+    finally:
+        # Always release the lock
+        try:
+            cur.execute("SELECT pg_advisory_unlock(865042025);")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        cur.close()
+        db_pool.putconn(conn)
 
-    # Sessions
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS app_sessions (
-            token TEXT PRIMARY KEY,
-            user_id BIGINT REFERENCES app_users(id) ON DELETE CASCADE,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            expires_at TIMESTAMPTZ NOT NULL
-        );
-    """)
-
-    # Events
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS user_events (
-            id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-            user_id BIGINT REFERENCES app_users(id) ON DELETE CASCADE,
-            event_name TEXT NOT NULL,
-            city TEXT,
-            lat DOUBLE PRECISION,
-            lon DOUBLE PRECISION,
-            event_date DATE NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
-
-    conn.commit()
-    cur.close()
-    db_pool.putconn(conn)
 
 
 # Initialize at import
