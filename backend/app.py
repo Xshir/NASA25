@@ -28,7 +28,7 @@ DB_CFG = {
     "password": os.getenv("POSTGRES_PASSWORD", "nasa2025"),
 }
 
-MM_USER = os.getenv("MM_USERNAME")  # Meteomatics
+MM_USER = os.getenv("MM_USERNAME")
 MM_PASS = os.getenv("MM_PASSWORD")
 
 db_pool: psycopool.SimpleConnectionPool | None = None
@@ -37,11 +37,9 @@ db_pool: psycopool.SimpleConnectionPool | None = None
 # DB bootstrap
 # ------------------------------------------------------------------------------
 def init_db_pool():
-    """Create a global psycopg2 pool with retry to avoid race with DB startup."""
     global db_pool
     if db_pool:
         return
-
     deadline = time.time() + 60
     last_err = None
     while time.time() < deadline:
@@ -56,30 +54,24 @@ def init_db_pool():
                 password=DB_CFG["password"],
             )
             conn = db_pool.getconn()
-            try:
-                with conn, conn.cursor() as cur:
-                    cur.execute("SELECT 1;")
-            finally:
-                db_pool.putconn(conn)
+            with conn, conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+            db_pool.putconn(conn)
             break
         except Exception as e:
             last_err = e
             time.sleep(2)
-
     if not db_pool:
         raise RuntimeError(f"Database not reachable: {last_err}")
-
     ensure_schema()
 
 
 def ensure_schema():
-    """Create tables if not exist."""
     conn = db_pool.getconn()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_advisory_lock(420420);")
-
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS app_users (
@@ -90,8 +82,6 @@ def ensure_schema():
                     );
                     """
                 )
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON app_users (username);")
-
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS events (
@@ -108,8 +98,6 @@ def ensure_schema():
                     );
                     """
                 )
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id, date);")
-
                 cur.execute("SELECT pg_advisory_unlock(420420);")
     finally:
         db_pool.putconn(conn)
@@ -183,22 +171,18 @@ def get_meteomatics_summary(lat: float, lon: float, date_iso: str):
             for p in js.get("data", []):
                 if p.get("parameter") == key:
                     pts = p.get("coordinates", [{}])[0].get("dates", [])
-                    return [pt["value"] for pt in pts if "value" in pt and pt["value"] is not None]
+                    return [pt["value"] for pt in pts if "value" in pt]
             return []
-        t = vals("t_2m:C")
-        pr = vals("precipitation_1h:mm")
-        ws = vals("wind_speed_10m:ms")
-        rh = vals("relative_humidity_2m:p")
-        cc = vals("cloud_cover:p")
-        if not any([t, pr, ws, rh, cc]):
-            return None
+        t = vals("t_2m:C"); pr = vals("precipitation_1h:mm"); ws = vals("wind_speed_10m:ms")
+        rh = vals("relative_humidity_2m:p"); cc = vals("cloud_cover:p")
+        if not any([t, pr, ws, rh, cc]): return None
         return {
             "t_max": max(t) if t else None,
             "t_min": min(t) if t else None,
             "precip_24h": sum(pr) if pr else 0.0,
             "wind_max": max(ws) if ws else None,
-            "rh_mean": sum(rh) / len(rh) if rh else None,
-            "cloud_mean": sum(cc) / len(cc) if cc else None,
+            "rh_mean": sum(rh)/len(rh) if rh else None,
+            "cloud_mean": sum(cc)/len(cc) if cc else None,
             "source": "meteomatics",
         }
     except Exception:
@@ -215,84 +199,50 @@ def get_nasa_power(lat: float, lon: float, date_iso: str):
             f"&start={d.strftime('%Y%m%d')}&end={d.strftime('%Y%m%d')}&format=JSON"
         )
         r = requests.get(url, timeout=12)
-        if r.status_code != 200:
-            return None
+        if r.status_code != 200: return None
         js = r.json()
         data = js.get("properties", {}).get("parameter", {})
         tmax = list(data.get("T2M_MAX", {}).values())[0]
         tmin = list(data.get("T2M_MIN", {}).values())[0]
         precip = list(data.get("PRECTOTCORR", {}).values())[0]
         solar = list(data.get("ALLSKY_SFC_SW_DWN", {}).values())[0]
-        avg_temp = (tmax + tmin) / 2.0
-        return {
-            "tmax": tmax,
-            "tmin": tmin,
-            "precip": precip,
-            "solar": solar,
-            "avg_temp": avg_temp,
-            "source": "nasa_power",
-        }
+        avg_temp = (tmax + tmin) / 2
+        return {"tmax":tmax,"tmin":tmin,"precip":precip,"solar":solar,"avg_temp":avg_temp,"source":"nasa_power"}
     except Exception:
         return None
 
 
 def interpret_conditions(metrics: dict | None, event_name: str):
     if not metrics:
-        return "mixed conditions", ["umbrella just in case", "water bottle", "sunscreen"]
-
+        return "mixed conditions", ["umbrella just in case","water bottle","sunscreen"]
     tips = []
-    tmax = metrics.get("t_max")
-    rain = metrics.get("precip_24h", 0) or 0
-    wind = metrics.get("wind_max")
-
-    if tmax is not None and tmax >= 33:
-        label = "very hot"
-    elif rain >= 10:
-        label = "very wet"
-    elif wind is not None and wind >= 10:
-        label = "very windy"
-    elif tmax is not None and tmax <= 18:
-        label = "cool"
-    else:
-        label = "fair"
-
-    if label == "very hot":
-        tips += ["pack extra ice", "bring shade/canopy", "portable fans", "electrolytes"]
-    if label == "very wet":
-        tips += ["bring umbrellas/raincoats", "waterproof bags", "consider backup shelter"]
-    if label == "very windy":
-        tips += ["secure tents/props", "avoid drone flights", "check wind gusts"]
-
-    e = (event_name or "").lower()
-    if any(k in e for k in ["picnic", "bbq", "barbecue", "beach", "park"]):
-        tips += ["cooler with ice", "sunscreen", "ground sheet"]
-    elif any(k in e for k in ["hike", "trail", "trek"]):
-        tips += ["hydration pack", "insect repellent", "trail shoes"]
-    elif any(k in e for k in ["drone", "flying", "aerial"]):
-        tips += ["spare batteries", "ND filters", "check NOTAM/no-fly zones"]
-    elif any(k in e for k in ["wedding", "ceremony", "outdoor event", "party"]):
-        tips += ["confirm canopy vendor", "confirm indoor fallback"]
-
-    seen = set()
-    tips = [t for t in tips if not (t in seen or seen.add(t))]
-    return label, tips
+    tmax = metrics.get("t_max"); rain = metrics.get("precip_24h",0); wind = metrics.get("wind_max")
+    if tmax and tmax>=33: label="very hot"
+    elif rain>=10: label="very wet"
+    elif wind and wind>=10: label="very windy"
+    elif tmax and tmax<=18: label="cool"
+    else: label="fair"
+    if label=="very hot": tips+=["pack extra ice","bring shade/canopy","portable fans","electrolytes"]
+    if label=="very wet": tips+=["bring umbrellas/raincoats","waterproof bags","consider backup shelter"]
+    if label=="very windy": tips+=["secure tents/props","avoid drone flights","check wind gusts"]
+    e=(event_name or "").lower()
+    if any(k in e for k in["picnic","bbq","barbecue","beach","park"]): tips+=["cooler with ice","sunscreen","ground sheet"]
+    elif any(k in e for k in["hike","trail","trek"]): tips+=["hydration pack","insect repellent","trail shoes"]
+    elif any(k in e for k in["drone","flying","aerial"]): tips+=["spare batteries","ND filters","check NOTAM/no-fly zones"]
+    elif any(k in e for k in["wedding","ceremony","outdoor event","party"]): tips+=["confirm canopy vendor","confirm indoor fallback"]
+    seen=set(); tips=[t for t in tips if not (t in seen or seen.add(t))]
+    return label,tips
 
 
 def reverse_geocode(lat: float, lon: float):
     try:
-        r = requests.get(
-            "https://nominatim.openstreetmap.org/reverse",
-            params={"format": "jsonv2", "lat": lat, "lon": lon, "zoom": 10, "addressdetails": 1},
-            headers={"User-Agent": "Plan4Cast/1.0 (contact: tp.plan4cast.earth)"},
-            timeout=8,
-        )
-        if r.status_code != 200:
-            return {}
-        js = r.json()
-        addr = js.get("address", {})
-        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county")
-        country = addr.get("country")
-        return {"city": city, "country": country}
+        r = requests.get("https://nominatim.openstreetmap.org/reverse",
+                         params={"format":"jsonv2","lat":lat,"lon":lon,"zoom":10,"addressdetails":1},
+                         headers={"User-Agent":"Plan4Cast/1.0"},timeout=8)
+        if r.status_code!=200: return {}
+        js=r.json(); addr=js.get("address",{})
+        city=addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county")
+        return {"city":city,"country":addr.get("country")}
     except Exception:
         return {}
 
@@ -300,32 +250,141 @@ def reverse_geocode(lat: float, lon: float):
 # Routes
 # ------------------------------------------------------------------------------
 @app.get("/health")
-def health():
-    return jsonify({"ok": True, "ts": time.time()})
+def health(): return jsonify({"ok":True,"ts":time.time()})
 
-# (all signup/login/events/suggest routes remain unchanged here — same as before)
-# Add them from the previous version you already have.
+@app.post("/signup")
+def signup():
+    init_db_pool(); data=request.get_json(force=True)
+    username=(data.get("username") or "").strip().lower(); pin=(data.get("pin") or "").strip()
+    if not username or not pin.isdigit() or len(pin)!=4: return jsonify({"error":"invalid username or pin"}),400
+    pin_hash=_hash_pin(username,pin)
+    conn=db_pool.getconn()
+    try:
+        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("INSERT INTO app_users (username,pin_hash) VALUES (%s,%s) ON CONFLICT (username) DO NOTHING RETURNING id;",
+                        (username,pin_hash)); row=cur.fetchone()
+            if not row:
+                cur.execute("SELECT id,pin_hash FROM app_users WHERE username=%s;",(username,))
+                row2=cur.fetchone()
+                if not row2 or row2["pin_hash"]!=pin_hash: return jsonify({"error":"username already exists"}),409
+                user_id=row2["id"]
+            else: user_id=row["id"]
+    finally: db_pool.putconn(conn)
+    return jsonify({"ok":True,"token":issue_token(user_id,username)})
+
+@app.post("/login")
+def login():
+    init_db_pool(); data=request.get_json(force=True)
+    username=(data.get("username") or "").strip().lower(); pin=(data.get("pin") or "").strip()
+    if not username or not pin.isdigit() or len(pin)!=4: return jsonify({"error":"invalid credentials"}),400
+    pin_hash=_hash_pin(username,pin)
+    conn=db_pool.getconn()
+    try:
+        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id,pin_hash FROM app_users WHERE username=%s;",(username,))
+            row=cur.fetchone()
+            if not row or row["pin_hash"]!=pin_hash: return jsonify({"error":"invalid credentials"}),401
+            user_id=row["id"]
+    finally: db_pool.putconn(conn)
+    return jsonify({"ok":True,"token":issue_token(user_id,username)})
+
+@app.get("/events")
+@require_auth
+def list_events(user):
+    init_db_pool(); conn=db_pool.getconn()
+    try:
+        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id,event_name,date::text AS date,city,country,lat,lon FROM events WHERE user_id=%s ORDER BY date ASC,id ASC;",(user["uid"],))
+            return jsonify(cur.fetchall())
+    finally: db_pool.putconn(conn)
+
+@app.post("/events")
+@require_auth
+def create_event(user):
+    init_db_pool(); d=request.get_json(force=True)
+    name=(d.get("event_name") or "").strip(); date=(d.get("date") or "").strip()
+    city=(d.get("city") or "").strip() or None; country=(d.get("country") or "").strip() or None
+    lat=d.get("lat"); lon=d.get("lon")
+    if not name or not date: return jsonify({"error":"missing fields"}),400
+    conn=db_pool.getconn()
+    try:
+        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("INSERT INTO events (user_id,event_name,date,city,country,lat,lon) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id,event_name,date::text,city,country,lat,lon;",
+                        (user["uid"],name,date,city,country,lat,lon))
+            return jsonify(cur.fetchone()),201
+    finally: db_pool.putconn(conn)
+
+@app.put("/events/<int:event_id>")
+@require_auth
+def update_event(user,event_id:int):
+    init_db_pool(); d=request.get_json(force=True)
+    name=(d.get("event_name") or "").strip(); date=(d.get("date") or "").strip()
+    city=(d.get("city") or "").strip() or None; country=(d.get("country") or "").strip() or None
+    lat=d.get("lat"); lon=d.get("lon")
+    if not name or not date: return jsonify({"error":"missing fields"}),400
+    conn=db_pool.getconn()
+    try:
+        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("UPDATE events SET event_name=%s,date=%s,city=%s,country=%s,lat=%s,lon=%s,updated_at=NOW() WHERE id=%s AND user_id=%s RETURNING id,event_name,date::text,city,country,lat,lon;",
+                        (name,date,city,country,lat,lon,event_id,user["uid"]))
+            row=cur.fetchone()
+            if not row: return jsonify({"error":"not found"}),404
+            return jsonify(row)
+    finally: db_pool.putconn(conn)
+
+@app.post("/suggest")
+@require_auth
+def suggest(user):
+    d=request.get_json(force=True)
+    event_name=(d.get("event_name") or "").strip(); date=d.get("date"); lat=d.get("lat"); lon=d.get("lon")
+    event_id=d.get("event_id")
+    if event_id:
+        conn=db_pool.getconn()
+        try:
+            with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT event_name,date::text,lat,lon,city,country FROM events WHERE id=%s AND user_id=%s;",(event_id,user["uid"]))
+                row=cur.fetchone()
+                if not row: return jsonify({"error":"event not found"}),404
+                event_name=event_name or row["event_name"]; date=date or row["date"]
+                lat=lat if lat is not None else row["lat"]; lon=lon if lon is not None else row["lon"]
+        finally: db_pool.putconn(conn)
+    mm=None; nasa=None
+    if date and (lat is not None) and (lon is not None):
+        try: mm=get_meteomatics_summary(float(lat),float(lon),date)
+        except Exception: mm=None
+        try: nasa=get_nasa_power(float(lat),float(lon),date)
+        except Exception: nasa=None
+    label,tips=interpret_conditions(mm,event_name)
+    context=None
+    if nasa and mm and mm.get("t_max") and nasa.get("avg_temp"):
+        diff=mm["t_max"]-nasa["avg_temp"]
+        if diff>3: context="Hotter than usual"
+        elif diff<-3: context="Cooler than usual"
+        else: context="Typical for this location"
+    return jsonify({"predicted":label,"advice":tips,"metrics":mm or {},"nasa_power":nasa or {},"context":context,
+                    "note":"Forecast fused from Meteomatics and NASA POWER climatology."})
+
+@app.get("/reverse_geocode")
+def api_reverse_geocode():
+    lat=request.args.get("lat",type=float); lon=request.args.get("lon",type=float)
+    if lat is None or lon is None: return jsonify({})
+    return jsonify(reverse_geocode(lat,lon))
 
 # ------------------------------------------------------------------------------
 # Serve static frontend
 # ------------------------------------------------------------------------------
 @app.get("/")
-def root():
-    """Serve the main web app."""
-    return send_from_directory("/app/static", "index.html")
+def root(): return send_from_directory("/app/static","index.html")
 
 @app.get("/<path:path>")
 def static_proxy(path):
-    """Serve other static assets if added later (JS, CSS, images)."""
-    try:
-        return send_from_directory("/app/static", path)
-    except Exception:
-        return jsonify({"error": "not found"}), 404
+    try: return send_from_directory("/app/static",path)
+    except Exception: return jsonify({"error":"not found"}),404
 
 # ------------------------------------------------------------------------------
 # Startup
 # ------------------------------------------------------------------------------
 init_db_pool()
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+if __name__=="__main__":
+    app.run(host="0.0.0.0",port=8000,debug=True)
