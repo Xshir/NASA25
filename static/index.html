@@ -115,6 +115,7 @@
     #gate .panel{ background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,520px); }
     #gate ul{margin:.5rem 0 .75rem 1.2rem}
     #weatherBar{ position:fixed; bottom:0; left:0; right:0; text-align:center; padding:.55rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(18,27,41,.92); font-size:.92rem }
+
     /* Loader overlay */
     #loaderOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3000;
       background:rgba(10,15,25,.75); backdrop-filter:blur(8px); }
@@ -181,10 +182,7 @@
       <button onclick="showHome()" class="btn btn-ghost" style="float:right;">← Back</button>
       <h2 id="eventTitle">Event</h2>
       <p id="eventSub" class="muted">Date & Location</p>
-
-      <!-- Weather line -->
       <p id="eventHeadline" style="margin:.2rem 0 .6rem;"></p>
-
       <h3>Recommendation Notes:</h3>
       <ul id="eventTips"></ul>
       <p class="muted" id="eventNote"></p>
@@ -224,7 +222,6 @@
           <div>
             <label for="citySelect">City</label>
             <select id="citySelect"></select>
-            <!-- No typing; this remains hidden -->
             <input id="cityOther" class="hidden" placeholder="Enter city" />
           </div>
         </div>
@@ -388,14 +385,19 @@
         const data = await r.json();
         const loc = [data.city, data.country].filter(Boolean).join(", ");
         document.getElementById("locLine").textContent = loc || "";
-        // preselect country if detected
-        if (data.country){
-          // find by exact name (case-insensitive)
-          const match = COUNTRY_LIST.find(c => c.name.toLowerCase() === data.country.toLowerCase());
-          if (match){
-            document.getElementById("countrySelect").value = match.code;
-            SELECTED_COUNTRY_CODE = match.code;
-            await loadCitiesForCountryCode(match.code, data.city || "");
+
+        // Best-effort preselect using country_code; fallback to name match
+        let code = data.country_code || "";
+        if (!code && data.country){
+          const hit = COUNTRY_LIST.find(c => c.name.toLowerCase() === data.country.toLowerCase());
+          if (hit) code = hit.code;
+        }
+        if (code){
+          const sel = document.getElementById("countrySelect");
+          if ([...sel.options].some(o => o.value === code)){
+            sel.value = code;
+            SELECTED_COUNTRY_CODE = code;
+            await loadCitiesForCountryCode(code, data.city || "");
           }
         }
       }catch(e){
@@ -430,7 +432,6 @@
 
       const sel = document.getElementById("countrySelect");
       sel.innerHTML = "";
-      // placeholder
       const ph = document.createElement("option");
       ph.value = ""; ph.textContent = "Select country…"; ph.disabled = true; ph.selected = true;
       sel.appendChild(ph);
@@ -454,9 +455,8 @@
       citySel.innerHTML = "";
       citySel.disabled = false;
 
-      // Singapore city-state: hide city selector and use "Singapore"
+      // Singapore: cityless
       if (code === "SG"){
-        citySel.innerHTML = "";
         const o = document.createElement("option");
         o.value = "Singapore"; o.textContent = "Singapore"; o.selected = true;
         citySel.appendChild(o);
@@ -507,10 +507,8 @@
       document.getElementById("eventDate").value = currentDateISO;
       setDateLabel(currentDateISO);
 
-      // When opening planner, preserve current country selection; if event has city, try preselect
       const sel = document.getElementById("countrySelect");
       if (!sel.value && SELECTED_COUNTRY_CODE) sel.value = SELECTED_COUNTRY_CODE;
-      // Load cities for currently selected country (with ev city preferred)
       if (sel.value){
         loadCitiesForCountryCode(sel.value, ev?.city || "");
       }
@@ -528,13 +526,12 @@
       const date = currentDateISO || document.getElementById("eventDate").value;
       const countryCode = document.getElementById("countrySelect").value;
       const citySel = document.getElementById("citySelect");
-      const city = citySel.disabled ? citySel.value : citySel.value; // if disabled (SG), it's "Singapore"
+      const city = citySel.disabled ? citySel.value : citySel.value; // SG -> "Singapore"
       const msg = document.getElementById("eventMsg");
 
       if(!name || !date || !countryCode){
         msg.textContent="Please provide event name, date, and country."; return;
       }
-      // Resolve country name by code
       const match = COUNTRY_LIST.find(c=>c.code===countryCode);
       const countryName = match ? match.name : "";
 

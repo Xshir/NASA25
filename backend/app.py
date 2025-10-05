@@ -61,11 +61,13 @@ def init_db_pool():
     ensure_schema()
 
 def ensure_schema():
+    """Create/upgrade schema idempotently (safe even if table already exists)."""
     conn = db_pool.getconn()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_advisory_lock(420420);")
+                # Base tables
                 cur.execute("""
                 CREATE TABLE IF NOT EXISTS app_users(
                     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -83,9 +85,12 @@ def ensure_schema():
                     country TEXT,
                     lat DOUBLE PRECISION,
                     lon DOUBLE PRECISION,
-                    created_at TIMESTAMPTZ DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                    created_at TIMESTAMPTZ DEFAULT NOW()
                 );""")
+                # Add missing columns safely
+                cur.execute("""ALTER TABLE events
+                               ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();""")
+                # Indexes
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON app_users(username);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id, date);")
                 cur.execute("SELECT pg_advisory_unlock(420420);")
@@ -251,7 +256,7 @@ def health(): return jsonify({"ok": True, "ts": time.time()})
 def signup():
     init_db_pool()
     d=request.get_json(force=True)
-    u=(d.get("username") or "").strip().toLowerCase() if hasattr(str, "toLowerCase") else (d.get("username") or "").strip().lower()
+    u=(d.get("username") or "").strip().lower()
     p=(d.get("pin") or "").strip()
     if not u or not p.isdigit() or len(p)!=4: return jsonify({"error":"invalid"}),400
     ph=_hash_pin(u,p)
@@ -275,6 +280,7 @@ def login():
     d=request.get_json(force=True)
     u=(d.get("username") or "").strip().lower()
     p=(d.get("pin") or "").strip()
+    if not u or not p.isdigit() or len(p)!=4: return jsonify({"error":"invalid"}),400
     ph=_hash_pin(u,p)
     conn=db_pool.getconn()
     try:
@@ -412,7 +418,8 @@ def current_weather():
             temp = vals.get("t_2m:C")
             sym = vals.get("weather_symbol_1h:idx")
             if sym is not None:
-                code = int(sym) if str(sym).isdigit() else 0
+                try: code = int(sym)
+                except: code = 0
                 desc = {
                     1:"Clear",2:"Mostly clear",3:"Partly cloudy",4:"Overcast",
                     5:"Fog",6:"Light rain",7:"Rain",8:"Heavy rain",9:"Snow",10:"Thunderstorms"
@@ -449,7 +456,6 @@ def geo_countries():
         return jsonify(out)
     except Exception as e:
         app.logger.warning(f"[geo_countries] fallback due {e}")
-        # Fallback small set
         fallback = [
             {"name":"Singapore","code":"SG"},{"name":"Japan","code":"JP"},
             {"name":"United States","code":"US"},{"name":"Malaysia","code":"MY"},
@@ -476,12 +482,14 @@ def geo_cities():
 
     # Resolve code via cache if only country provided
     if not code and country:
-        # ensure countries cache
-        _ = geo_countries().json if callable(getattr(geo_countries, "json", None)) else None  # no-op to satisfy linters
         if not COUNTRY_CACHE["data"]:
-            # Fetch once if empty
             try:
-                requests.get("https://restcountries.com/v3.1/all?fields=name,cca2", timeout=10)
+                rc = requests.get("https://restcountries.com/v3.1/all?fields=name,cca2", timeout=10)
+                if rc.status_code == 200:
+                    COUNTRY_CACHE["data"] = [
+                        {"name": (it.get("name",{}) or {}).get("common"), "code": it.get("cca2","").upper()}
+                        for it in rc.json() if (it.get("name",{}) or {}).get("common") and it.get("cca2")
+                    ]
             except Exception:
                 pass
         for item in COUNTRY_CACHE["data"]:
@@ -521,7 +529,7 @@ def geo_cities():
             nm = tags.get("name:en") or tags.get("name")
             if not nm: continue
             pop = tags.get("population")
-            try: pop = int(pop.replace(",","")) if pop else 0
+            try: pop = int(str(pop).replace(",","")) if pop else 0
             except Exception: pop = 0
             items.append((nm, pop))
 
@@ -539,6 +547,36 @@ def geo_cities():
     except Exception as e:
         app.logger.error(f"[geo_cities EXC] {e}")
         return jsonify({"code": code, "country": country or code, "cities": []})
+
+# ------------------------------------------------------------------------------
+# Reverse geocoding (adds country_code)
+# ------------------------------------------------------------------------------
+def reverse_geocode_core(lat: float, lon: float):
+    try:
+        r = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={"format": "jsonv2", "lat": lat, "lon": lon, "zoom": 10, "addressdetails": 1},
+            headers={"User-Agent": "Plan4Cast/1.0 (contact: tp.plan4cast.earth)"},
+            timeout=8,
+        )
+        if r.status_code != 200:
+            return {}
+        js = r.json()
+        addr = js.get("address", {})
+        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county")
+        country = addr.get("country")
+        code = addr.get("country_code").upper() if addr.get("country_code") else None
+        return {"city": city, "country": country, "country_code": code}
+    except Exception:
+        return {}
+
+@app.get("/reverse_geocode")
+def api_reverse_geocode():
+    lat = request.args.get("lat", type=float)
+    lon = request.args.get("lon", type=float)
+    if lat is None or lon is None:
+        return jsonify({})
+    return jsonify(reverse_geocode_core(lat, lon))
 
 # ------------------------------------------------------------------------------
 # Static frontend
