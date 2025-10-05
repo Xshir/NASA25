@@ -7,6 +7,8 @@ from psycopg2 import pool as psycopool
 from psycopg2.extras import RealDictCursor
 
 # ------------------------------------------------------------------------------
+# App setup
+# ------------------------------------------------------------------------------
 app = Flask(__name__, static_folder=None)
 CORS(app, supports_credentials=False)
 app.logger.setLevel(logging.INFO)
@@ -22,8 +24,11 @@ DB_CFG = dict(
     user=os.getenv("POSTGRES_USER", "nasa2025"),
     password=os.getenv("POSTGRES_PASSWORD", "nasa2025"),
 )
+
 db_pool: psycopg2.pool.SimpleConnectionPool | None = None
 
+# ------------------------------------------------------------------------------
+# DB init
 # ------------------------------------------------------------------------------
 def init_db_pool():
     global db_pool
@@ -150,6 +155,7 @@ def get_meteomatics_summary(lat: float, lon: float, date_iso: str):
         return None
 
 def get_nasa_power(lat: float, lon: float, date_iso: str):
+    """NASA POWER climatology; skip gracefully for future dates."""
     try:
         d = dt.datetime.fromisoformat(date_iso)
         url = (
@@ -159,7 +165,7 @@ def get_nasa_power(lat: float, lon: float, date_iso: str):
             f"&start={d:%Y%m%d}&end={d:%Y%m%d}&format=JSON"
         )
         r = requests.get(url, timeout=12)
-        if r.status_code == 400 or r.status_code == 500:
+        if r.status_code in (400, 500):
             app.logger.info("[NASA] Skipping — likely future date")
             return None
         if r.status_code != 200:
@@ -207,10 +213,31 @@ def interpret_conditions(m, event_name: str):
     elif any(k in e for k in ["hike", "trail", "trek"]):
         tips += ["hydration pack", "insect repellent", "trail shoes"]
 
+    # dedupe
     seen = set()
     tips = [t for t in tips if not (t in seen or seen.add(t))]
     return label, tips
 
+# ------------------------------------------------------------------------------
+# JSON error handlers
+# ------------------------------------------------------------------------------
+def _wants_json():
+    a = request.headers.get("Accept",""); c = request.headers.get("Content-Type","")
+    return ("application/json" in a) or ("application/json" in c)
+
+@app.errorhandler(404)
+def _404(e):
+    if _wants_json(): return jsonify({"error":"not found"}),404
+    if request.method=="GET": return send_from_directory("/app/static","index.html")
+    return "Not found",404
+
+@app.errorhandler(500)
+def _500(e):
+    app.logger.error(f"[500] {e}")
+    return (jsonify({"error":"server error"}),500) if _wants_json() else ("Server error",500)
+
+# ------------------------------------------------------------------------------
+# Core routes
 # ------------------------------------------------------------------------------
 @app.get("/health")
 def health(): return jsonify({"ok": True, "ts": time.time()})
@@ -325,15 +352,69 @@ def suggest(user):
         "note": "Forecast fused from Meteomatics and NASA POWER climatology."
     })
 
-@app.get("/reverse_geocode")
-def api_reverse_geocode():
-    lat=request.args.get("lat",type=float); lon=request.args.get("lon",type=float)
-    if lat is None or lon is None: return jsonify({})
+# ------------------------------------------------------------------------------
+# NEW: current weather for Home screen
+# ------------------------------------------------------------------------------
+@app.get("/current_weather")
+def current_weather():
+    """Get current temperature & a condition name from Meteomatics (with fallback)."""
+    lat = request.args.get("lat", type=float)
+    lon = request.args.get("lon", type=float)
+    if lat is None or lon is None or not (MM_USER and MM_PASS):
+        return jsonify({})
     try:
-        r=reverse_geocode(lat,lon)
-        return jsonify(r)
-    except Exception: return jsonify({})
+        now = dt.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        # First try: temp + symbol
+        params = "t_2m:C,weather_symbol_1h:idx"
+        url = f"https://api.meteomatics.com/{now:%Y-%m-%dT%H:%M:%SZ}/{params}/{lat:.4f},{lon:.4f}/json"
+        r = requests.get(url, auth=(MM_USER, MM_PASS), timeout=10)
+        app.logger.info(f"[current_weather] {r.status_code} {url}")
 
+        desc = "Unknown"
+        temp = None
+
+        if r.status_code == 200:
+            js = r.json()
+            vals = {p["parameter"]: p["coordinates"][0]["dates"][0]["value"]
+                    for p in js.get("data", []) if p.get("coordinates")}
+            temp = vals.get("t_2m:C")
+            sym = vals.get("weather_symbol_1h:idx")
+            if sym is not None:
+                try:
+                    code = int(sym)
+                except Exception:
+                    code = 0
+                # Simple mapping
+                desc_map = {
+                    1: "Clear", 2: "Mostly clear", 3: "Partly cloudy", 4: "Overcast",
+                    5: "Fog", 6: "Light rain", 7: "Rain", 8: "Heavy rain",
+                    9: "Snow", 10: "Thunderstorms"
+                }
+                desc = desc_map.get(code, "Unknown")
+
+        # If symbol not available (404 due to plan limits), retry with temp only
+        if (temp is None) and r.status_code != 200:
+            params2 = "t_2m:C"
+            url2 = f"https://api.meteomatics.com/{now:%Y-%m-%dT%H:%M:%SZ}/{params2}/{lat:.4f},{lon:.4f}/json"
+            r2 = requests.get(url2, auth=(MM_USER, MM_PASS), timeout=10)
+            app.logger.info(f"[current_weather-fallback] {r2.status_code} {url2}")
+            if r2.status_code == 200:
+                js2 = r2.json()
+                try:
+                    temp = js2["data"][0]["coordinates"][0]["dates"][0]["value"]
+                    desc = "Current temperature"
+                except Exception:
+                    temp = None
+
+        if temp is None:
+            return jsonify({})
+        return jsonify({"temp": temp, "desc": desc})
+    except Exception as e:
+        app.logger.error(f"[current_weather EXC] {e}")
+        return jsonify({})
+
+# ------------------------------------------------------------------------------
+# Static frontend
 # ------------------------------------------------------------------------------
 @app.get("/")
 def root(): return send_from_directory("/app/static","index.html")
@@ -341,7 +422,7 @@ def root(): return send_from_directory("/app/static","index.html")
 @app.get("/<path:path>")
 def static_proxy(path):
     try: return send_from_directory("/app/static",path)
-    except Exception: return jsonify({"error":"not found"}),404
+    except Exception: return _404(None)
 
 # ------------------------------------------------------------------------------
 init_db_pool()

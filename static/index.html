@@ -152,7 +152,7 @@
           <div class="time" id="clock">--:--</div>
           <div class="loc" id="locLine">Locating…</div>
         </div>
-        <div class="wx" id="wxNow">Weather: (coming soon)</div>
+        <div class="wx" id="wxNow">Weather: —</div>
         <button class="btn btn-primary" onclick="openPlanner('create')">Plan</button>
       </div>
 
@@ -324,6 +324,8 @@
         document.getElementById("weatherBar").textContent = `Location: (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
         hideGate();
         await prefillLocation(latitude, longitude);
+        // NEW: live current weather line
+        updateCurrentWeather(latitude, longitude);
       }, (err)=>{
         if (err?.code === err.PERMISSION_DENIED){
           showGate();
@@ -358,6 +360,21 @@
     }
     function showGate(){ document.getElementById("gate").style.display="flex"; }
     function hideGate(){ document.getElementById("gate").style.display="none"; }
+
+    // ---------- Current Weather (NEW) ----------
+    async function updateCurrentWeather(lat, lon){
+      try{
+        const r = await fetch(`/current_weather?lat=${lat}&lon=${lon}`);
+        const data = await r.json();
+        if (data && typeof data.temp === "number"){
+          document.getElementById("wxNow").textContent = `Weather: ${data.temp.toFixed(1)}°C • ${data.desc || "—"}`;
+        } else {
+          document.getElementById("wxNow").textContent = "Weather: unavailable";
+        }
+      }catch(e){
+        document.getElementById("wxNow").textContent = "Weather: error";
+      }
+    }
 
     // ---------- Planner ----------
     function openPlanner(mode="create", ev=null){
