@@ -28,6 +28,14 @@ DB_CFG = dict(
 db_pool: psycopg2.pool.SimpleConnectionPool | None = None
 
 # ------------------------------------------------------------------------------
+# In-memory caches for countries & cities
+# ------------------------------------------------------------------------------
+COUNTRY_CACHE = {"ts": 0, "data": []}                   # [{"name":"Singapore","code":"SG"}, ...]
+CITY_CACHE: dict[str, dict] = {}                         # {"SG": {"ts": 0, "data": ["Singapore"]}, ...}
+CACHE_TTL_COUNTRIES = 60 * 60 * 24 * 7                   # 7 days
+CACHE_TTL_CITIES = 60 * 60 * 24 * 3                      # 3 days
+
+# ------------------------------------------------------------------------------
 # DB init
 # ------------------------------------------------------------------------------
 def init_db_pool():
@@ -197,12 +205,10 @@ def interpret_conditions(m, event_name: str):
     elif tmax is not None and tmax <= 18: label = "cool"
     else: label = "fair"
 
-    # Base tips by weather
     if label == "very hot": tips += ["bring shade/canopy", "portable fans", "stay hydrated"]
     if label == "very wet": tips += ["raincoat", "waterproof bag", "check shelter options"]
     if label == "cool": tips += ["light jacket"]
 
-    # Event-specific context
     e = (event_name or "").lower()
     if any(k in e for k in ["drone", "flying", "aerial"]):
         tips += ["check wind before flight", "bring ND filters", "spare batteries", "consider skipping if winds exceed 10 m/s"]
@@ -213,7 +219,6 @@ def interpret_conditions(m, event_name: str):
     elif any(k in e for k in ["hike", "trail", "trek"]):
         tips += ["hydration pack", "insect repellent", "trail shoes"]
 
-    # dedupe
     seen = set()
     tips = [t for t in tips if not (t in seen or seen.add(t))]
     return label, tips
@@ -246,7 +251,8 @@ def health(): return jsonify({"ok": True, "ts": time.time()})
 def signup():
     init_db_pool()
     d=request.get_json(force=True)
-    u=(d.get("username") or "").strip().lower(); p=(d.get("pin") or "").strip()
+    u=(d.get("username") or "").strip().toLowerCase() if hasattr(str, "toLowerCase") else (d.get("username") or "").strip().lower()
+    p=(d.get("pin") or "").strip()
     if not u or not p.isdigit() or len(p)!=4: return jsonify({"error":"invalid"}),400
     ph=_hash_pin(u,p)
     conn=db_pool.getconn()
@@ -267,7 +273,8 @@ def signup():
 def login():
     init_db_pool()
     d=request.get_json(force=True)
-    u=(d.get("username") or "").strip().lower(); p=(d.get("pin") or "").strip()
+    u=(d.get("username") or "").strip().lower()
+    p=(d.get("pin") or "").strip()
     ph=_hash_pin(u,p)
     conn=db_pool.getconn()
     try:
@@ -296,16 +303,45 @@ def list_events(user):
 def create_event(user):
     init_db_pool()
     d=request.get_json(force=True)
-    name=(d.get("event_name") or "").strip(); date=(d.get("date") or "").strip()
+    name=(d.get("event_name") or "").strip()
+    date=(d.get("date") or "").strip()
+    city=(d.get("city") or "").strip() or None
+    country=(d.get("country") or "").strip() or None
     lat=d.get("lat"); lon=d.get("lon")
     if not name or not date: return jsonify({"error":"missing fields"}),400
     conn=db_pool.getconn()
     try:
         with conn,conn.cursor(cursor_factory=RealDictCursor) as c:
-            c.execute("""INSERT INTO events(user_id,event_name,date,lat,lon)
-                         VALUES(%s,%s,%s,%s,%s)
-                         RETURNING id,event_name,date::text,lat,lon;""",(user["uid"],name,date,lat,lon))
+            c.execute("""INSERT INTO events(user_id,event_name,date,city,country,lat,lon)
+                         VALUES(%s,%s,%s,%s,%s,%s,%s)
+                         RETURNING id,event_name,date::text AS date,city,country,lat,lon;""",
+                      (user["uid"],name,date,city,country,lat,lon))
             return jsonify(c.fetchone()),201
+    finally: db_pool.putconn(conn)
+
+@app.put("/events/<int:event_id>")
+@require_auth
+def update_event(user, event_id: int):
+    init_db_pool()
+    d=request.get_json(force=True)
+    name=(d.get("event_name") or "").strip()
+    date=(d.get("date") or "").strip()
+    city=(d.get("city") or "").strip() or None
+    country=(d.get("country") or "").strip() or None
+    lat=d.get("lat"); lon=d.get("lon")
+    if not name or not date: return jsonify({"error":"missing fields"}),400
+
+    conn=db_pool.getconn()
+    try:
+        with conn,conn.cursor(cursor_factory=RealDictCursor) as c:
+            c.execute("""UPDATE events
+                         SET event_name=%s,date=%s,city=%s,country=%s,lat=%s,lon=%s,updated_at=NOW()
+                         WHERE id=%s AND user_id=%s
+                         RETURNING id,event_name,date::text AS date,city,country,lat,lon;""",
+                      (name,date,city,country,lat,lon,event_id,user["uid"]))
+            row=c.fetchone()
+            if not row: return jsonify({"error":"not found"}),404
+            return jsonify(row)
     finally: db_pool.putconn(conn)
 
 @app.post("/suggest")
@@ -335,7 +371,6 @@ def suggest(user):
     app.logger.info(f"[/suggest] mm={mm} nasa={nasa}")
 
     label,tips=interpret_conditions(mm,event_name)
-    # Compose readable weather stats for UI
     stats_text=None
     if mm:
         tmax=mm.get("t_max"); rain=mm.get("precip_24h",0)
@@ -353,18 +388,16 @@ def suggest(user):
     })
 
 # ------------------------------------------------------------------------------
-# NEW: current weather for Home screen
+# Current weather for Home screen
 # ------------------------------------------------------------------------------
 @app.get("/current_weather")
 def current_weather():
-    """Get current temperature & a condition name from Meteomatics (with fallback)."""
     lat = request.args.get("lat", type=float)
     lon = request.args.get("lon", type=float)
     if lat is None or lon is None or not (MM_USER and MM_PASS):
         return jsonify({})
     try:
         now = dt.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-        # First try: temp + symbol
         params = "t_2m:C,weather_symbol_1h:idx"
         url = f"https://api.meteomatics.com/{now:%Y-%m-%dT%H:%M:%SZ}/{params}/{lat:.4f},{lon:.4f}/json"
         r = requests.get(url, auth=(MM_USER, MM_PASS), timeout=10)
@@ -372,7 +405,6 @@ def current_weather():
 
         desc = "Unknown"
         temp = None
-
         if r.status_code == 200:
             js = r.json()
             vals = {p["parameter"]: p["coordinates"][0]["dates"][0]["value"]
@@ -380,31 +412,11 @@ def current_weather():
             temp = vals.get("t_2m:C")
             sym = vals.get("weather_symbol_1h:idx")
             if sym is not None:
-                try:
-                    code = int(sym)
-                except Exception:
-                    code = 0
-                # Simple mapping
-                desc_map = {
-                    1: "Clear", 2: "Mostly clear", 3: "Partly cloudy", 4: "Overcast",
-                    5: "Fog", 6: "Light rain", 7: "Rain", 8: "Heavy rain",
-                    9: "Snow", 10: "Thunderstorms"
-                }
-                desc = desc_map.get(code, "Unknown")
-
-        # If symbol not available (404 due to plan limits), retry with temp only
-        if (temp is None) and r.status_code != 200:
-            params2 = "t_2m:C"
-            url2 = f"https://api.meteomatics.com/{now:%Y-%m-%dT%H:%M:%SZ}/{params2}/{lat:.4f},{lon:.4f}/json"
-            r2 = requests.get(url2, auth=(MM_USER, MM_PASS), timeout=10)
-            app.logger.info(f"[current_weather-fallback] {r2.status_code} {url2}")
-            if r2.status_code == 200:
-                js2 = r2.json()
-                try:
-                    temp = js2["data"][0]["coordinates"][0]["dates"][0]["value"]
-                    desc = "Current temperature"
-                except Exception:
-                    temp = None
+                code = int(sym) if str(sym).isdigit() else 0
+                desc = {
+                    1:"Clear",2:"Mostly clear",3:"Partly cloudy",4:"Overcast",
+                    5:"Fog",6:"Light rain",7:"Rain",8:"Heavy rain",9:"Snow",10:"Thunderstorms"
+                }.get(code,"Unknown")
 
         if temp is None:
             return jsonify({})
@@ -412,6 +424,121 @@ def current_weather():
     except Exception as e:
         app.logger.error(f"[current_weather EXC] {e}")
         return jsonify({})
+
+# ------------------------------------------------------------------------------
+# Geo endpoints: ALL countries + preset cities per country
+# ------------------------------------------------------------------------------
+@app.get("/geo/countries")
+def geo_countries():
+    """Return [{name, code}] of all countries (cached)."""
+    try:
+        now = time.time()
+        if COUNTRY_CACHE["data"] and now - COUNTRY_CACHE["ts"] < CACHE_TTL_COUNTRIES:
+            return jsonify(COUNTRY_CACHE["data"])
+        r = requests.get("https://restcountries.com/v3.1/all?fields=name,cca2", timeout=15)
+        r.raise_for_status()
+        out = []
+        for it in r.json():
+            nm = (it.get("name",{}) or {}).get("common")
+            code = it.get("cca2")
+            if nm and code:
+                out.append({"name": nm, "code": code.upper()})
+        out.sort(key=lambda x: x["name"])
+        COUNTRY_CACHE["data"] = out
+        COUNTRY_CACHE["ts"] = now
+        return jsonify(out)
+    except Exception as e:
+        app.logger.warning(f"[geo_countries] fallback due {e}")
+        # Fallback small set
+        fallback = [
+            {"name":"Singapore","code":"SG"},{"name":"Japan","code":"JP"},
+            {"name":"United States","code":"US"},{"name":"Malaysia","code":"MY"},
+            {"name":"Indonesia","code":"ID"},{"name":"Thailand","code":"TH"},
+            {"name":"Vietnam","code":"VN"},{"name":"Philippines","code":"PH"},
+            {"name":"India","code":"IN"},{"name":"China","code":"CN"},
+            {"name":"Australia","code":"AU"},{"name":"United Kingdom","code":"GB"}
+        ]
+        return jsonify(fallback)
+
+@app.get("/geo/cities")
+def geo_cities():
+    """
+    Return top cities for a given country.
+    Query: ?code=SG or ?country=Singapore
+    Uses Overpass API (OSM) and caches results.
+    """
+    code = (request.args.get("code") or "").strip().upper()
+    country = (request.args.get("country") or "").strip()
+
+    # Special case: Singapore as a city-state
+    if code == "SG" or country.lower() == "singapore":
+        return jsonify({"code":"SG","country":"Singapore","cities":[],"cityless":True})
+
+    # Resolve code via cache if only country provided
+    if not code and country:
+        # ensure countries cache
+        _ = geo_countries().json if callable(getattr(geo_countries, "json", None)) else None  # no-op to satisfy linters
+        if not COUNTRY_CACHE["data"]:
+            # Fetch once if empty
+            try:
+                requests.get("https://restcountries.com/v3.1/all?fields=name,cca2", timeout=10)
+            except Exception:
+                pass
+        for item in COUNTRY_CACHE["data"]:
+            if item["name"].lower() == country.lower():
+                code = item["code"]
+                break
+
+    if not code:
+        return jsonify({"cities":[]})
+
+    # cache
+    now = time.time()
+    cached = CITY_CACHE.get(code)
+    if cached and (now - cached["ts"] < CACHE_TTL_CITIES):
+        return jsonify({"code": code, "country": country or code, "cities": cached["data"]})
+
+    try:
+        # Overpass query: cities and large towns within country by ISO3166-1 code
+        q = f"""
+        [out:json][timeout:25];
+        area["ISO3166-1"="{code}"][admin_level=2]->.boundary;
+        (
+          node["place"="city"](area.boundary);
+          node["place"="town"](area.boundary);
+        );
+        out tags;
+        """
+        r = requests.post("https://overpass-api.de/api/interpreter", data=q.encode("utf-8"), timeout=30)
+        if r.status_code != 200:
+            app.logger.warning(f"[geo_cities] Overpass {r.status_code}: {r.text[:120]}")
+            return jsonify({"code":code, "country":country or code, "cities":[]})
+
+        js = r.json()
+        items = []
+        for el in js.get("elements", []):
+            tags = el.get("tags", {})
+            nm = tags.get("name:en") or tags.get("name")
+            if not nm: continue
+            pop = tags.get("population")
+            try: pop = int(pop.replace(",","")) if pop else 0
+            except Exception: pop = 0
+            items.append((nm, pop))
+
+        # dedupe by name keep max pop
+        byname = {}
+        for nm, pop in items:
+            if nm not in byname or pop > byname[nm]:
+                byname[nm] = pop
+        # sort by population desc, then name
+        sorted_names = sorted(byname.items(), key=lambda x:(-x[1], x[0]))[:80]
+        cities = [nm for nm,_ in sorted_names] or sorted(byname.keys())[:80]
+
+        CITY_CACHE[code] = {"ts": now, "data": cities}
+        return jsonify({"code": code, "country": country or code, "cities": cities})
+    except Exception as e:
+        app.logger.error(f"[geo_cities EXC] {e}")
+        return jsonify({"code": code, "country": country or code, "cities": []})
 
 # ------------------------------------------------------------------------------
 # Static frontend

@@ -18,7 +18,7 @@
       margin:0; color:#eaf5ff;
       background:
         radial-gradient(1200px 600px at 10% -10%, #0a1930 0%, transparent 60%),
-        radial-gradient(1000px 500px at 90% 110%, #08212f 0, transparent 55%),
+        radial-gradient(1000px 500px at 90% 110%, #08212f 0%, transparent 55%),
         linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
       -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
     }
@@ -29,11 +29,12 @@
       padding:24px 16px 72px;
       transition:filter .25s ease, opacity .25s ease;
     }
-    #app.blurred{ filter:blur(12px) saturate(85%) brightness(.85); }
+    #app.blurred{ filter:blur(14px) saturate(80%) brightness(.82); }
 
     h1{color:var(--teal); margin:.2rem 0 .3rem; letter-spacing:.4px}
     h2{color:var(--mint); margin:1rem 0 .6rem}
     .muted{color:var(--muted)}
+    .tagline{margin-top:-2px;text-align:center}
 
     .card{
       background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
@@ -53,7 +54,7 @@
       border:1px solid rgba(255,255,255,.08);
     }
     .time{font-size:1.25rem; font-weight:700}
-    .loc{font-size:.95rem; color:var(--muted)}
+    .loc{font-size:.95rem; color:var(--muted); min-height:1.2em}
     .wx{font-size:.95rem; opacity:.9}
 
     .btn{
@@ -114,12 +115,23 @@
     #gate .panel{ background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,520px); }
     #gate ul{margin:.5rem 0 .75rem 1.2rem}
     #weatherBar{ position:fixed; bottom:0; left:0; right:0; text-align:center; padding:.55rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(18,27,41,.92); font-size:.92rem }
+    /* Loader overlay */
+    #loaderOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3000;
+      background:rgba(10,15,25,.75); backdrop-filter:blur(8px); }
+    .loader{ width:64px; height:64px; border:4px solid rgba(255,255,255,.25); border-top:4px solid var(--teal);
+      border-radius:50%; animation:spin 1s linear infinite; }
+    @keyframes spin{ to{ transform:rotate(360deg) } }
+
+    /* Welcome overlay */
+    #welcomeOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3500;
+      background:rgba(10,15,25,.95); color:#fff; flex-direction:column; transition:opacity 1.5s ease; }
+    #welcomeOverlay h2{ font-size:2rem; color:var(--teal); margin:0; }
   </style>
 </head>
 <body>
   <div id="app">
     <h1>Plan4Cast</h1>
-    <p class="muted" style="margin-top:-2px;">Powered By NASA's POWER Dataset & Meteomatics API</p>
+    <p class="muted tagline">Powered By NASA's POWER Dataset & Meteomatics API</p>
 
     <!-- LOGIN -->
     <div id="loginCard" class="card">
@@ -150,7 +162,6 @@
       <div class="header">
         <div>
           <div class="time" id="clock">--:--</div>
-          <!-- Location line: start empty; only show once resolved -->
           <div class="loc" id="locLine"></div>
         </div>
         <div class="wx" id="wxNow">Weather: —</div>
@@ -170,8 +181,11 @@
       <button onclick="showHome()" class="btn btn-ghost" style="float:right;">← Back</button>
       <h2 id="eventTitle">Event</h2>
       <p id="eventSub" class="muted">Date & Location</p>
-      <h3>Suggested prep</h3>
+
+      <!-- Weather line -->
       <p id="eventHeadline" style="margin:.2rem 0 .6rem;"></p>
+
+      <h3>Recommendation Notes:</h3>
       <ul id="eventTips"></ul>
       <p class="muted" id="eventNote"></p>
     </div>
@@ -210,6 +224,7 @@
           <div>
             <label for="citySelect">City</label>
             <select id="citySelect"></select>
+            <!-- No typing; this remains hidden -->
             <input id="cityOther" class="hidden" placeholder="Enter city" />
           </div>
         </div>
@@ -241,8 +256,9 @@
     </div>
   </div>
 
-  <!-- Bottom bar: fixed team label -->
-  <div id="weatherBar">Temasek Polytechnic Team 1</div>
+  <div id="weatherBar">Temasek Polytechnic Team 1 (AEL/AEG/BME) + SP EEE</div>
+  <div id="loaderOverlay"><div class="loader"></div></div>
+  <div id="welcomeOverlay"><h2 id="welcomeText"></h2></div>
 
   <script>
     // ---------- Globals & routing ----------
@@ -251,15 +267,31 @@
     let currentDateISO = "";
     let plannerMode = "create";
     let editingId = null;
+    let COUNTRY_LIST = []; // [{name,code}]
+    let SELECTED_COUNTRY_CODE = "";
 
     function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")); }
     function showLogin(){ hideAll(); document.getElementById("loginCard").classList.remove("hidden"); }
     function showSignup(){ hideAll(); document.getElementById("signupCard").classList.remove("hidden"); }
     function showHome(){ hideAll(); document.getElementById("homeCard").classList.remove("hidden"); fetchEvents(); }
-    function showEvent(){ hideAll(); document.getElementById("eventCard").classList.remove("hidden"); }
 
-    window.addEventListener("load", () => {
+    function showLoader(show=true){
+      document.getElementById("loaderOverlay").style.display = show ? "flex" : "none";
+      document.getElementById("app").classList.toggle("blurred", show);
+    }
+
+    function welcome(username){
+      const w = document.getElementById("welcomeOverlay");
+      document.getElementById("welcomeText").textContent = `Welcome, ${username}`;
+      w.style.display = "flex";
+      document.getElementById("app").classList.add("blurred");
+      setTimeout(()=>{ w.style.opacity = "0"; document.getElementById("app").classList.remove("blurred"); }, 1200);
+      setTimeout(()=>{ w.style.display = "none"; showHome(); }, 2100);
+    }
+
+    window.addEventListener("load", async () => {
       tickClock(); setInterval(tickClock, 1000);
+      await loadCountries(); // populate countries first
       ensureGeoPermission();
       if (TOKEN) showHome(); else showLogin();
       wireDatePicker();
@@ -269,17 +301,21 @@
     async function signup(){
       const username = document.getElementById("signupUsername").value.trim().toLowerCase();
       const pin = document.getElementById("signupPin").value.trim();
+      showLoader(true);
       const r = await fetch(`${API_BASE}/signup`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
       const data = await r.json();
-      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); showHome(); }
+      showLoader(false);
+      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); welcome(username); }
       else document.getElementById("signupMsg").textContent=data.error||"Signup failed";
     }
     async function login(){
       const username = document.getElementById("loginUsername").value.trim().toLowerCase();
       const pin = document.getElementById("loginPin").value.trim();
+      showLoader(true);
       const r = await fetch(`${API_BASE}/login`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
       const data = await r.json();
-      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); showHome(); }
+      showLoader(false);
+      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); welcome(username); }
       else document.getElementById("loginMsg").textContent=data.error||"Login failed";
     }
     function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin(); }
@@ -325,7 +361,7 @@
         window.currentCoords = {lat:latitude, lon:longitude};
         hideGate();
         await prefillLocation(latitude, longitude);
-        updateCurrentWeather(latitude, longitude); // live current weather
+        updateCurrentWeather(latitude, longitude);
       }, (err)=>{
         if (err?.code === err.PERMISSION_DENIED){
           showGate();
@@ -351,13 +387,19 @@
         const r = await fetch(`/reverse_geocode?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
         const data = await r.json();
         const loc = [data.city, data.country].filter(Boolean).join(", ");
-        // Show location ONLY if we actually have one; otherwise keep blank
         document.getElementById("locLine").textContent = loc || "";
-        populateCountry(data.country||"");
-        populateCity(data.city||"");
+        // preselect country if detected
+        if (data.country){
+          // find by exact name (case-insensitive)
+          const match = COUNTRY_LIST.find(c => c.name.toLowerCase() === data.country.toLowerCase());
+          if (match){
+            document.getElementById("countrySelect").value = match.code;
+            SELECTED_COUNTRY_CODE = match.code;
+            await loadCitiesForCountryCode(match.code, data.city || "");
+          }
+        }
       }catch(e){
         document.getElementById("locLine").textContent = "";
-        populateCountry(""); populateCity("");
       }
     }
     function showGate(){ document.getElementById("gate").style.display="flex"; }
@@ -378,6 +420,81 @@
       }
     }
 
+    // ---------- Countries & Cities (ALL countries, preset cities) ----------
+    async function loadCountries(){
+      try{
+        const r = await fetch(`/geo/countries`);
+        const list = await r.json();
+        COUNTRY_LIST = Array.isArray(list) ? list : [];
+      }catch{ COUNTRY_LIST = []; }
+
+      const sel = document.getElementById("countrySelect");
+      sel.innerHTML = "";
+      // placeholder
+      const ph = document.createElement("option");
+      ph.value = ""; ph.textContent = "Select country…"; ph.disabled = true; ph.selected = true;
+      sel.appendChild(ph);
+
+      COUNTRY_LIST.forEach(c=>{
+        const o = document.createElement("option");
+        o.value = c.code; o.textContent = c.name;
+        sel.appendChild(o);
+      });
+
+      sel.onchange = async ()=>{
+        const code = sel.value;
+        SELECTED_COUNTRY_CODE = code;
+        await loadCitiesForCountryCode(code, "");
+      };
+    }
+
+    async function loadCitiesForCountryCode(code, preferCity=""){
+      const citySel = document.getElementById("citySelect");
+      const cityOther = document.getElementById("cityOther");
+      citySel.innerHTML = "";
+      citySel.disabled = false;
+
+      // Singapore city-state: hide city selector and use "Singapore"
+      if (code === "SG"){
+        citySel.innerHTML = "";
+        const o = document.createElement("option");
+        o.value = "Singapore"; o.textContent = "Singapore"; o.selected = true;
+        citySel.appendChild(o);
+        citySel.disabled = true;
+        return;
+      }
+
+      try{
+        showLoader(true);
+        const r = await fetch(`/geo/cities?code=${encodeURIComponent(code)}`);
+        const data = await r.json();
+        const cities = data.cities || [];
+        citySel.innerHTML = "";
+
+        const o0=document.createElement("option");
+        o0.value=""; o0.textContent="Select city…"; o0.disabled=true; o0.selected=true;
+        citySel.appendChild(o0);
+
+        cities.forEach(n=>{
+          const o=document.createElement("option");
+          o.value=n; o.textContent=n;
+          citySel.appendChild(o);
+        });
+
+        if (preferCity){
+          const options = [...citySel.options].map(op=>op.value);
+          if (options.includes(preferCity)) citySel.value = preferCity;
+        }
+      }catch(e){
+        citySel.innerHTML = "";
+        const o0=document.createElement("option");
+        o0.value=""; o0.textContent="(No cities available)"; o0.disabled=true; o0.selected=true;
+        citySel.appendChild(o0);
+      } finally {
+        showLoader(false);
+      }
+    }
+
     // ---------- Planner ----------
     function openPlanner(mode="create", ev=null){
       plannerMode = mode;
@@ -390,11 +507,12 @@
       document.getElementById("eventDate").value = currentDateISO;
       setDateLabel(currentDateISO);
 
-      populateCity(ev?.city || document.getElementById("citySelect").value);
-      if (ev?.city) {
-        const sel = document.getElementById("citySelect");
-        let found=false; [...sel.options].forEach(o=>{ if(o.value===ev.city){ o.selected=true; found=true; }});
-        if(!found){ sel.value="__OTHER__"; document.getElementById("cityOther").classList.remove("hidden"); document.getElementById("cityOther").value = ev.city; }
+      // When opening planner, preserve current country selection; if event has city, try preselect
+      const sel = document.getElementById("countrySelect");
+      if (!sel.value && SELECTED_COUNTRY_CODE) sel.value = SELECTED_COUNTRY_CODE;
+      // Load cities for currently selected country (with ev city preferred)
+      if (sel.value){
+        loadCitiesForCountryCode(sel.value, ev?.city || "");
       }
 
       document.getElementById("planner").style.display = "flex";
@@ -403,21 +521,29 @@
     function closePlanner(){
       document.getElementById("planner").style.display = "none";
       document.getElementById("app").classList.remove("blurred");
-      document.getElementById("cityOther").classList.add("hidden");
-      document.getElementById("cityOther").value="";
     }
 
     async function saveEvent(){
       const name = document.getElementById("eventName").value.trim();
       const date = currentDateISO || document.getElementById("eventDate").value;
-      const city = chosenCity();
+      const countryCode = document.getElementById("countrySelect").value;
+      const citySel = document.getElementById("citySelect");
+      const city = citySel.disabled ? citySel.value : citySel.value; // if disabled (SG), it's "Singapore"
       const msg = document.getElementById("eventMsg");
-      if(!name || !date || !city){ msg.textContent="Please provide event name, date, and city."; return; }
 
-      const body = { event_name:name, city, date };
+      if(!name || !date || !countryCode){
+        msg.textContent="Please provide event name, date, and country."; return;
+      }
+      // Resolve country name by code
+      const match = COUNTRY_LIST.find(c=>c.code===countryCode);
+      const countryName = match ? match.name : "";
+
+      const body = { event_name:name, date, country:countryName };
+      if (city) body.city = city;
       if (window.currentCoords) { body.lat=window.currentCoords.lat; body.lon=window.currentCoords.lon; }
 
       try{
+        showLoader(true);
         let r, data;
         if (plannerMode === "edit" && editingId){
           r = await fetch(`/events/${editingId}`, {
@@ -443,6 +569,8 @@
         await fetchEvents();
       }catch(e){
         msg.textContent = "Error: " + e.message;
+      } finally {
+        showLoader(false);
       }
     }
 
@@ -463,46 +591,14 @@
       label.textContent = `${day} ${mo} ${yr}`;
     }
 
-    // ---------- Country / City ----------
-    const COUNTRIES = [
-      "Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","India","China","Japan","South Korea",
-      "Australia","New Zealand","United States","Canada","United Kingdom","Germany","France","Spain","Italy","Netherlands"
-    ];
-    function populateCountry(selected){
-      const sel = document.getElementById("countrySelect");
-      sel.innerHTML = "";
-      const list = [...COUNTRIES];
-      if(selected && !list.includes(selected)) list.unshift(selected);
-      list.forEach(c=>{
-        const o=document.createElement("option"); o.value=c; o.textContent=c; if(c===selected) o.selected=true; sel.appendChild(o);
-      });
-    }
-    function populateCity(detected){
-      const citySel = document.getElementById("citySelect");
-      const cityOther = document.getElementById("cityOther");
-      citySel.innerHTML = "";
-      if(detected){
-        const od = document.createElement("option");
-        od.value=detected; od.textContent=`${detected}`; citySel.appendChild(od); citySel.value=detected;
-      } else {
-        const o0=document.createElement("option"); o0.value=""; o0.textContent="Select city…"; o0.disabled=true; o0.selected=true; citySel.appendChild(o0);
-      }
-      const oOther=document.createElement("option"); oOther.value="__OTHER__"; oOther.textContent="Other city…"; citySel.appendChild(oOther);
-      cityOther.classList.add("hidden");
-      citySel.onchange = ()=> {
-        if(citySel.value==="__OTHER__") cityOther.classList.remove("hidden");
-        else { cityOther.classList.add("hidden"); cityOther.value=""; }
-      };
-    }
-    function chosenCity(){
-      const sel = document.getElementById("citySelect");
-      return sel.value==="__OTHER__" ? document.getElementById("cityOther").value.trim() : sel.value;
-    }
-
     // ---------- Events ----------
+    function toTitleCase(s){ return (s||"").replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()); }
+
     async function fetchEvents(){
+      showLoader(true);
       const r = await fetch(`/events`, {headers:{Authorization:`Bearer ${TOKEN}`}});
       const data = await r.json();
+      showLoader(false);
       const list = document.getElementById("eventsList");
       list.innerHTML = "";
       if(!Array.isArray(data) || data.length===0){
@@ -512,7 +608,7 @@
       data.forEach(e=>{
         const row=document.createElement("div"); row.className="item";
         const left=document.createElement("div");
-        left.innerHTML=`<div class="item-title">${e.event_name}</div><div class="item-sub">${e.date}${e.city? " • "+e.city:""}</div>`;
+        left.innerHTML=`<div class="item-title">${toTitleCase(e.event_name)}</div><div class="item-sub">${e.date}${e.city? " • "+e.city:""}</div>`;
         const btns=document.createElement("div"); btns.className="btn-row";
         const b1=document.createElement("button"); b1.className="btn btn-primary"; b1.textContent="View"; b1.onclick=()=>openEventDetails(e);
         const b2=document.createElement("button"); b2.className="btn btn-ghost"; b2.textContent="Edit"; b2.onclick=()=>openPlanner('edit', e);
@@ -522,18 +618,22 @@
     }
 
     async function openEventDetails(e){
-      document.getElementById("eventTitle").textContent = e.event_name;
+      showLoader(true);
+      document.getElementById("eventTitle").textContent = toTitleCase(e.event_name);
       document.getElementById("eventSub").textContent = `${e.date}${e.city ? " • " + e.city : ""}`;
 
       const body = e.id ? {event_id:e.id} : {event_name:e.event_name, date:e.date, lat:e.lat, lon:e.lon};
       const r = await fetch(`/suggest`, {method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${TOKEN}`}, body:JSON.stringify(body)});
       const data = await r.json();
 
-      document.getElementById("eventHeadline").textContent = `Predicted weather: ${data.predicted || "—"}`;
+      const headline = `<b>Predicted Weather:</b> ${data.predicted || "—"}`;
+      document.getElementById("eventHeadline").innerHTML = headline;
       const tips = document.getElementById("eventTips"); tips.innerHTML="";
       (data.advice||[]).forEach(t=>{ const li=document.createElement("li"); li.textContent=t; tips.appendChild(li); });
       document.getElementById("eventNote").textContent = data.note || "";
-      showEvent();
+
+      showLoader(false);
+      hideAll(); document.getElementById("eventCard").classList.remove("hidden");
     }
   </script>
 </body>
