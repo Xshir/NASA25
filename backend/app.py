@@ -126,44 +126,32 @@ def require_auth(fn):
 # External data (Meteomatics + NASA POWER)
 # ------------------------------------------------------------------------------
 def get_meteomatics_summary(lat: float, lon: float, date_iso: str):
-    """Fetch Meteomatics hourly data and compute daily summary."""
+    """Fetch Meteomatics daily summary (free-tier safe)."""
     if not (MM_USER and MM_PASS):
         app.logger.warning("[Meteomatics] Missing credentials")
         return None
     try:
         d = dt.datetime.fromisoformat(date_iso)
-        start, end = f"{d:%Y-%m-%dT00:00:00Z}", f"{d:%Y-%m-%dT23:59:59Z}"
-        params = "t_2m:C,precipitation_1h:mm,wind_speed_10m:ms,relative_humidity_2m:p,cloud_cover:p"
-        url = f"https://api.meteomatics.com/{start}--{end}:PT1H/{params}/{lat:.4f},{lon:.4f}/json"
+        # Use daily aggregated params available to academic/free accounts
+        params = "t_max_2m_24h:C,t_min_2m_24h:C,precip_24h:mm,wind_speed_10m_max_24h:ms"
+        url = (
+            f"https://api.meteomatics.com/{d:%Y-%m-%dT00:00:00Z}/{params}/{lat:.4f},{lon:.4f}/json"
+        )
         r = requests.get(url, auth=(MM_USER, MM_PASS), timeout=15)
         app.logger.info(f"[Meteomatics] {r.status_code} {url}")
         if r.status_code != 200:
             app.logger.warning(f"[Meteomatics body] {r.text[:200]}")
             return None
+
         js = r.json()
-        def series(key):
-            for p in js.get("data", []):
-                if p.get("parameter") == key:
-                    coords = p.get("coordinates") or []
-                    if not coords: return []
-                    return [pt.get("value") for pt in coords[0].get("dates", []) if isinstance(pt, dict)]
-            return []
-        t = series("t_2m:C")
-        pr = series("precipitation_1h:mm")
-        ws = series("wind_speed_10m:ms")
-        rh = series("relative_humidity_2m:p")
-        cc = series("cloud_cover:p")
-        if not any([t, pr, ws, rh, cc]):
-            app.logger.warning("[Meteomatics] parsed empty lists")
-            return None
+        data = {p["parameter"]: p["coordinates"][0]["dates"][0]["value"]
+                for p in js.get("data", []) if p.get("coordinates")}
         out = {
-            "t_max": max(t) if t else None,
-            "t_min": min(t) if t else None,
-            "precip_24h": sum(pr) if pr else 0.0,
-            "wind_max": max(ws) if ws else None,
-            "rh_mean": (sum(rh)/len(rh)) if rh else None,
-            "cloud_mean": (sum(cc)/len(cc)) if cc else None,
-            "source": "meteomatics",
+            "t_max": data.get("t_max_2m_24h:C"),
+            "t_min": data.get("t_min_2m_24h:C"),
+            "precip_24h": data.get("precip_24h:mm", 0),
+            "wind_max": data.get("wind_speed_10m_max_24h:ms"),
+            "source": "meteomatics (daily aggregate)"
         }
         app.logger.info(f"[Meteomatics summary] {out}")
         return out
@@ -182,9 +170,13 @@ def get_nasa_power(lat: float, lon: float, date_iso: str):
             f"&start={d:%Y%m%d}&end={d:%Y%m%d}&format=JSON"
         )
         r = requests.get(url, timeout=12)
+        if r.status_code == 400 or r.status_code == 500:
+            app.logger.info("[NASA] Skipping — likely future date")
+            return None
         if r.status_code != 200:
             app.logger.warning(f"[NASA] {r.status_code} body={r.text[:120]}")
             return None
+
         param = r.json().get("properties", {}).get("parameter", {})
         tmax = list(param.get("T2M_MAX", {}).values())[0]
         tmin = list(param.get("T2M_MIN", {}).values())[0]
