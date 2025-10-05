@@ -13,8 +13,8 @@ services:
       POSTGRES_PASSWORD: nasa2025
       APP_SECRET: super-secret-change-me
       GUNICORN_CMD_ARGS: "--workers=1 --log-level=debug --capture-output --enable-stdio-inheritance"
-      MM_USERNAME: "polytechnic_temasek"
-      MM_PASSWORD: "R62gl0Mb7Ylam8ri36Mt"
+      MM_USERNAME: polytechnic_temasek
+      MM_PASSWORD: R62gl0Mb7Ylam8ri36Mt
     depends_on:
       - db
   db:
