@@ -59,7 +59,6 @@
     .btn{
       padding:.55rem .9rem; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem;
       transition:transform .05s ease, background .2s ease, box-shadow .2s ease;
-      box-shadow:none;
     }
     .btn:active{transform:translateY(1px)}
     .btn-primary{background:var(--mint); color:#0b0c10;}
@@ -88,27 +87,6 @@
       border-radius:16px; width:min(92vw,560px); padding:18px;
       box-shadow:0 20px 60px rgba(0,0,0,.5);
     }
-    .row{display:grid; gap:.9rem}
-    .row-2{grid-template-columns:1fr 1fr}
-    label{font-size:.92rem; color:var(--muted); display:block; margin:.2rem 0 .35rem}
-    input,select{
-      width:100%; padding:.65rem .75rem; border:1px solid var(--stroke); border-radius:10px;
-      background:#0f1928; color:#fff; font-size:1rem; outline:none;
-      box-shadow:0 3px 0 rgba(0,0,0,.25) inset;
-    }
-
-    .date-line{display:flex; align-items:center; gap:.8rem}
-    .date-label{min-width:150px; color:var(--muted)}
-    .date-wrap{position:relative; width:46px; height:46px}
-    .icon-btn{
-      width:46px; height:46px; border-radius:12px; background:#213247; border:1px solid var(--stroke);
-      display:flex; align-items:center; justify-content:center;
-    }
-    .icon-btn:hover{background:#2a3b53}
-    .date-overlay{position:absolute; inset:0; opacity:0; cursor:pointer}
-    .calendar-emoji{font-size:20px}
-
-    #cityOther{margin-top:.4rem}
 
     #gate{ position:fixed; inset:0; background:rgba(5,10,18,.92); display:none; align-items:center; justify-content:center; z-index:1500; }
     #gate .panel{ background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,520px); }
@@ -119,7 +97,7 @@
 <body>
   <div id="app">
     <h1>Plan4Cast</h1>
-    <p class="muted" style="margin-top:-2px;">Plan your perfect event — powered by NASA & Meteomatics</p>
+    <p class="muted" style="margin-top:-2px;">Powered by NASA POWER & Meteomatics API</p>
 
     <!-- LOGIN -->
     <div id="loginCard" class="card">
@@ -165,91 +143,36 @@
     </div>
 
     <!-- EVENT DETAILS -->
-    <div id="eventCard" class="card hidden">
+    <div id="eventCard" class="card hidden" style="padding:24px 26px;">
       <button onclick="showHome()" class="btn btn-ghost" style="float:right;">← Back</button>
-      <h2 id="eventTitle">Event</h2>
-      <p id="eventSub" class="muted">Date & Location</p>
-      <h3>Suggested prep</h3>
-      <p id="eventHeadline" style="margin:.2rem 0 .6rem;"></p>
-      <ul id="eventTips"></ul>
-      <p class="muted" id="eventNote"></p>
-    </div>
-  </div>
+      <h2 id="eventTitle" style="margin-bottom:4px;">Event Overview</h2>
+      <p id="eventSub" class="muted" style="margin-bottom:18px;"></p>
 
-  <!-- Planner modal -->
-  <div id="planner" class="modal">
-    <div class="sheet">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2 id="plannerTitle">Plan New Event</h2>
-        <button class="btn btn-ghost" onclick="closePlanner()">✕</button>
+      <!-- Weather summary -->
+      <div style="background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+                  border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:16px 18px;
+                  margin-bottom:18px; box-shadow:0 4px 14px rgba(0,0,0,.25);">
+        <h3 style="color:var(--teal); margin:0 0 6px;">Weather Summary</h3>
+        <p id="eventHeadline" style="font-size:1.05rem; margin:0;"></p>
       </div>
 
-      <div class="row">
-        <div>
-          <label for="eventName">Event name</label>
-          <input id="eventName" />
-        </div>
-
-        <div>
-          <label>Date</label>
-          <div class="date-line">
-            <span class="date-label" id="dateLabel">No date selected</span>
-            <div class="date-wrap">
-              <button class="icon-btn" title="Pick date"><span class="calendar-emoji">📅</span></button>
-              <input id="eventDate" type="date" class="date-overlay" />
-            </div>
-          </div>
-        </div>
-
-        <div class="row row-2">
-          <div>
-            <label for="countrySelect">Country</label>
-            <select id="countrySelect"></select>
-          </div>
-          <div>
-            <label for="citySelect">City</label>
-            <select id="citySelect"></select>
-            <input id="cityOther" class="hidden" placeholder="Enter city" />
-          </div>
-        </div>
-
-        <div style="display:flex; gap:.6rem; justify-content:flex-end; margin-top:.4rem;">
-          <button class="btn btn-ghost" onclick="closePlanner()">Cancel</button>
-          <button id="saveBtn" class="btn btn-primary" onclick="saveEvent()">Save</button>
-        </div>
-
-        <p id="eventMsg"></p>
+      <!-- Recommendations -->
+      <div style="background:linear-gradient(180deg,rgba(0,255,255,.03),rgba(255,255,255,.02));
+                  border:1px solid rgba(102,252,241,.15); border-radius:14px; padding:18px 20px;
+                  box-shadow:inset 0 0 12px rgba(102,252,241,.08);">
+        <h3 style="color:var(--mint);margin:0 0 8px;">Recommendations</h3>
+        <ul id="eventTips" style="margin:0;padding-left:1.1rem;"></ul>
+        <p class="muted" id="eventNote" style="margin-top:12px; font-size:.9rem;"></p>
       </div>
-    </div>
-  </div>
-
-  <!-- Location gate -->
-  <div id="gate">
-    <div class="panel">
-      <h2>Location is required</h2>
-      <p class="muted">We use your location to tailor weather guidance for your plans.</p>
-      <ul class="muted">
-        <li>If you previously selected <b>Block</b>, allow location for this site in your browser settings.</li>
-        <li>Then come back and tap <b>Ask for location</b>.</li>
-      </ul>
-      <div style="display:flex; gap:.5rem; flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="askForLocation()">Ask for location</button>
-        <button class="btn btn-ghost" onclick="openHelp()">How to allow</button>
-      </div>
-      <p id="gateMsg" class="muted" style="margin-top:.6rem;"></p>
     </div>
   </div>
 
   <div id="weatherBar">Requesting location permission…</div>
 
   <script>
-    // ---------- Globals & routing ----------
     const API_BASE = "";
     let TOKEN = localStorage.getItem("token") || null;
     let currentDateISO = "";
-    let plannerMode = "create";
-    let editingId = null;
-
     function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")); }
     function showLogin(){ hideAll(); document.getElementById("loginCard").classList.remove("hidden"); }
     function showSignup(){ hideAll(); document.getElementById("signupCard").classList.remove("hidden"); }
@@ -260,260 +183,73 @@
       tickClock(); setInterval(tickClock, 1000);
       ensureGeoPermission();
       if (TOKEN) showHome(); else showLogin();
-      wireDatePicker();
     });
 
-    // ---------- Auth ----------
     async function signup(){
-      const username = document.getElementById("signupUsername").value.trim().toLowerCase();
-      const pin = document.getElementById("signupPin").value.trim();
-      const r = await fetch(`${API_BASE}/signup`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
-      const data = await r.json();
-      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); showHome(); }
+      const username=document.getElementById("signupUsername").value.trim().toLowerCase();
+      const pin=document.getElementById("signupPin").value.trim();
+      const r=await fetch(`${API_BASE}/signup`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,pin})});
+      const data=await r.json();
+      if(data.ok){TOKEN=data.token;localStorage.setItem("token",TOKEN);showHome();}
       else document.getElementById("signupMsg").textContent=data.error||"Signup failed";
     }
     async function login(){
-      const username = document.getElementById("loginUsername").value.trim().toLowerCase();
-      const pin = document.getElementById("loginPin").value.trim();
-      const r = await fetch(`${API_BASE}/login`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
-      const data = await r.json();
-      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); showHome(); }
+      const username=document.getElementById("loginUsername").value.trim().toLowerCase();
+      const pin=document.getElementById("loginPin").value.trim();
+      const r=await fetch(`${API_BASE}/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,pin})});
+      const data=await r.json();
+      if(data.ok){TOKEN=data.token;localStorage.setItem("token",TOKEN);showHome();}
       else document.getElementById("loginMsg").textContent=data.error||"Login failed";
     }
-    function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin(); }
+    function logout(){TOKEN=null;localStorage.removeItem("token");showLogin();}
 
-    // ---------- Clock ----------
     function tickClock(){
-      const now = new Date();
-      const hh = now.getHours().toString().padStart(2,"0");
-      const mm = now.getMinutes().toString().padStart(2,"0");
-      document.getElementById("clock").textContent = `${hh}:${mm}`;
+      const now=new Date(); const hh=now.getHours().toString().padStart(2,"0"); const mm=now.getMinutes().toString().padStart(2,"0");
+      document.getElementById("clock").textContent=`${hh}:${mm}`;
     }
-
-    // ---------- Geolocation with prompt control ----------
-    function askForLocation(){ requestLocation(true); }
 
     async function ensureGeoPermission(){
-      const gateMsg = document.getElementById("gateMsg");
       try{
-        if (navigator.permissions?.query){
-          const status = await navigator.permissions.query({name:"geolocation"});
-          const apply = () => {
-            if (status.state === "granted"){
-              hideGate(); requestLocation(false);
-            } else if (status.state === "prompt"){
-              showGate(); gateMsg.textContent = "Tap “Ask for location” to continue.";
-            } else {
-              showGate(); gateMsg.textContent = "Location is blocked for this site. Allow it in your browser settings, then tap “Ask for location”.";
-            }
-          };
-          status.onchange = apply;
-          apply();
-        } else {
-          requestLocation(true);
-        }
-      } catch {
-        requestLocation(true);
-      }
+        const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej));
+        const {latitude,longitude}=pos.coords;
+        window.currentCoords={lat:latitude,lon:longitude};
+        document.getElementById("weatherBar").textContent=`Location: (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
+      }catch(e){document.getElementById("weatherBar").textContent="Location unavailable";}
     }
 
-    function requestLocation(spawnPrompt=false){
-      navigator.geolocation.getCurrentPosition(async (pos)=>{
-        const {latitude, longitude} = pos.coords;
-        window.currentCoords = {lat:latitude, lon:longitude};
-        document.getElementById("weatherBar").textContent = `Location: (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
-        hideGate();
-        await prefillLocation(latitude, longitude);
-      }, (err)=>{
-        if (err?.code === err.PERMISSION_DENIED){
-          showGate();
-          document.getElementById("gateMsg").textContent = "Permission denied. Allow location for this site, then press “Ask for location”.";
-        } else {
-          showGate();
-          document.getElementById("gateMsg").textContent = "Unable to get location. Please try again.";
-        }
-      }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
-    }
-
-    function openHelp(){
-      const ua = navigator.userAgent.toLowerCase();
-      let url = "https://support.google.com/chrome/answer/142065?hl=en";
-      if (ua.includes("firefox")) url = "https://support.mozilla.org/en-US/kb/site-permissions";
-      else if (ua.includes("safari") && !ua.includes("chrome")) url = "https://support.apple.com/guide/safari/safo40501/mac";
-      else if (ua.includes("edg/")) url = "https://support.microsoft.com/topic/manage-location-permissions-in-microsoft-edge";
-      window.open(url, "_blank");
-    }
-
-    async function prefillLocation(lat,lon){
-      try{
-        const r = await fetch(`/reverse_geocode?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
-        const data = await r.json();
-        const loc = [data.city, data.country].filter(Boolean).join(", ");
-        document.getElementById("locLine").textContent = loc || "Location detected";
-        populateCountry(data.country||"");
-        populateCity(data.city||"");
-      }catch(e){
-        populateCountry(""); populateCity("");
-      }
-    }
-    function showGate(){ document.getElementById("gate").style.display="flex"; }
-    function hideGate(){ document.getElementById("gate").style.display="none"; }
-
-    // ---------- Planner ----------
-    function openPlanner(mode="create", ev=null){
-      plannerMode = mode;
-      editingId = ev?.id ?? null;
-      document.getElementById("plannerTitle").textContent = mode==="edit" ? "Edit Event" : "Plan New Event";
-      document.getElementById("eventMsg").textContent = "";
-
-      document.getElementById("eventName").value = ev?.event_name || "";
-      currentDateISO = ev?.date || "";
-      document.getElementById("eventDate").value = currentDateISO;
-      setDateLabel(currentDateISO);
-
-      populateCity(ev?.city || document.getElementById("citySelect").value);
-      if (ev?.city) {
-        const sel = document.getElementById("citySelect");
-        let found=false; [...sel.options].forEach(o=>{ if(o.value===ev.city){ o.selected=true; found=true; }});
-        if(!found){ sel.value="__OTHER__"; document.getElementById("cityOther").classList.remove("hidden"); document.getElementById("cityOther").value = ev.city; }
-      }
-
-      document.getElementById("planner").style.display = "flex";
-      document.getElementById("app").classList.add("blurred");
-    }
-    function closePlanner(){
-      document.getElementById("planner").style.display = "none";
-      document.getElementById("app").classList.remove("blurred");
-      document.getElementById("cityOther").classList.add("hidden");
-      document.getElementById("cityOther").value="";
-    }
-
-    async function saveEvent(){
-      const name = document.getElementById("eventName").value.trim();
-      const date = currentDateISO || document.getElementById("eventDate").value;
-      const city = chosenCity();
-      const msg = document.getElementById("eventMsg");
-      if(!name || !date || !city){ msg.textContent="Please provide event name, date, and city."; return; }
-
-      const body = { event_name:name, city, date };
-      if (window.currentCoords) { body.lat=window.currentCoords.lat; body.lon=window.currentCoords.lon; }
-
-      try{
-        let r, data;
-        if (plannerMode === "edit" && editingId){
-          r = await fetch(`/events/${editingId}`, {
-            method:"PUT",
-            headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` },
-            body: JSON.stringify(body)
-          });
-          data = await r.json();
-          if(!r.ok) throw new Error(data.error||"Update failed");
-          closePlanner();
-          await openEventDetails({ id: editingId, event_name:name, city, date });
-        } else {
-          r = await fetch(`/events`, {
-            method:"POST",
-            headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` },
-            body: JSON.stringify(body)
-          });
-          data = await r.json();
-          if(!r.ok) throw new Error(data.error||"Create failed");
-          closePlanner();
-          await openEventDetails(data);
-        }
-        await fetchEvents();
-      }catch(e){
-        msg.textContent = "Error: " + e.message;
-      }
-    }
-
-    function wireDatePicker(){
-      const dateInput = document.getElementById("eventDate");
-      dateInput.addEventListener("change", () => {
-        currentDateISO = dateInput.value;
-        setDateLabel(currentDateISO);
-      });
-    }
-    function setDateLabel(iso){
-      const label = document.getElementById("dateLabel");
-      if(!iso){ label.textContent = "No date selected"; return; }
-      const d = new Date(iso + "T00:00:00");
-      const day = d.getDate().toString().padStart(2,"0");
-      const mo  = d.toLocaleString(undefined,{month:"short"});
-      const yr  = d.getFullYear();
-      label.textContent = `${day} ${mo} ${yr}`;
-    }
-
-    // ---------- Country / City ----------
-    const COUNTRIES = [
-      "Singapore","Malaysia","Indonesia","Thailand","Vietnam","Philippines","India","China","Japan","South Korea",
-      "Australia","New Zealand","United States","Canada","United Kingdom","Germany","France","Spain","Italy","Netherlands"
-    ];
-    function populateCountry(selected){
-      const sel = document.getElementById("countrySelect");
-      sel.innerHTML = "";
-      const list = [...COUNTRIES];
-      if(selected && !list.includes(selected)) list.unshift(selected);
-      list.forEach(c=>{
-        const o=document.createElement("option"); o.value=c; o.textContent=c; if(c===selected) o.selected=true; sel.appendChild(o);
-      });
-    }
-    function populateCity(detected){
-      const citySel = document.getElementById("citySelect");
-      const cityOther = document.getElementById("cityOther");
-      citySel.innerHTML = "";
-      if(detected){
-        const od = document.createElement("option");
-        od.value=detected; od.textContent=`${detected}`; citySel.appendChild(od); citySel.value=detected;
-      } else {
-        const o0=document.createElement("option"); o0.value=""; o0.textContent="Select city…"; o0.disabled=true; o0.selected=true; citySel.appendChild(o0);
-      }
-      const oOther=document.createElement("option"); oOther.value="__OTHER__"; oOther.textContent="Other city…"; citySel.appendChild(oOther);
-      cityOther.classList.add("hidden");
-      citySel.onchange = ()=> {
-        if(citySel.value==="__OTHER__") cityOther.classList.remove("hidden");
-        else { cityOther.classList.add("hidden"); cityOther.value=""; }
-      };
-    }
-    function chosenCity(){
-      const sel = document.getElementById("citySelect");
-      return sel.value==="__OTHER__" ? document.getElementById("cityOther").value.trim() : sel.value;
-    }
-
-    // ---------- Events ----------
     async function fetchEvents(){
-      const r = await fetch(`/events`, {headers:{Authorization:`Bearer ${TOKEN}`}});
-      const data = await r.json();
-      const list = document.getElementById("eventsList");
-      list.innerHTML = "";
-      if(!Array.isArray(data) || data.length===0){
-        list.innerHTML = `<div class="muted">No events yet — use the <b>Plan</b> button above.</div>`;
-        return;
-      }
+      const r=await fetch(`/events`,{headers:{Authorization:`Bearer ${TOKEN}`}});const data=await r.json();
+      const list=document.getElementById("eventsList");list.innerHTML="";
+      if(!Array.isArray(data)||data.length===0){list.innerHTML=`<div class="muted">No events yet — use the <b>Plan</b> button above.</div>`;return;}
       data.forEach(e=>{
-        const row=document.createElement("div"); row.className="item";
+        const row=document.createElement("div");row.className="item";
         const left=document.createElement("div");
-        left.innerHTML=`<div class="item-title">${e.event_name}</div><div class="item-sub">${e.date}${e.city? " • "+e.city:""}</div>`;
-        const btns=document.createElement("div"); btns.className="btn-row";
-        const b1=document.createElement("button"); b1.className="btn btn-primary"; b1.textContent="View"; b1.onclick=()=>openEventDetails(e);
-        const b2=document.createElement("button"); b2.className="btn btn-ghost"; b2.textContent="Edit"; b2.onclick=()=>openPlanner('edit', e);
-        btns.appendChild(b1); btns.appendChild(b2);
-        row.appendChild(left); row.appendChild(btns); list.appendChild(row);
+        left.innerHTML=`<div class="item-title">${e.event_name}</div><div class="item-sub">${e.date}${e.city?" • "+e.city:""}</div>`;
+        const btns=document.createElement("div");btns.className="btn-row";
+        const b1=document.createElement("button");b1.className="btn btn-primary";b1.textContent="View";b1.onclick=()=>openEventDetails(e);
+        btns.appendChild(b1);row.appendChild(left);row.appendChild(btns);list.appendChild(row);
       });
     }
 
     async function openEventDetails(e){
-      document.getElementById("eventTitle").textContent = e.event_name;
-      document.getElementById("eventSub").textContent = `${e.date}${e.city ? " • " + e.city : ""}`;
+      document.getElementById("eventTitle").textContent=e.event_name;
+      document.getElementById("eventSub").textContent=`${e.date}${e.city?" • "+e.city:""}`;
+      const body=e.id?{event_id:e.id}:{event_name:e.event_name,date:e.date,lat:e.lat,lon:e.lon};
+      const r=await fetch(`/suggest`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${TOKEN}`},body:JSON.stringify(body)});
+      const data=await r.json();
 
-      const body = e.id ? {event_id:e.id} : {event_name:e.event_name, date:e.date, lat:e.lat, lon:e.lon};
-      const r = await fetch(`/suggest`, {method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${TOKEN}`}, body:JSON.stringify(body)});
-      const data = await r.json();
+      // pick icon
+      const cond=(data.predicted||"").toLowerCase();
+      let icon="🌤️";
+      if(cond.includes("hot")) icon="☀️";
+      else if(cond.includes("wet")||cond.includes("rain")) icon="🌧️";
+      else if(cond.includes("wind")) icon="🌬️";
+      else if(cond.includes("cool")) icon="❄️";
 
-      document.getElementById("eventHeadline").textContent = `Predicted weather: ${data.predicted || "—"}`;
-      const tips = document.getElementById("eventTips"); tips.innerHTML="";
-      (data.advice||[]).forEach(t=>{ const li=document.createElement("li"); li.textContent=t; tips.appendChild(li); });
-      document.getElementById("eventNote").textContent = data.note || "";
+      document.getElementById("eventHeadline").innerHTML=`${icon} <b>${data.predicted||"—"}</b>`;
+      const tipsList=document.getElementById("eventTips");tipsList.innerHTML="";
+      (data.advice||[]).forEach(t=>{const li=document.createElement("li");li.textContent=t;tipsList.appendChild(li);});
+      document.getElementById("eventNote").textContent=data.note||"";
       showEvent();
     }
   </script>
