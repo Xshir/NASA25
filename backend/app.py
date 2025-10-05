@@ -4,7 +4,6 @@ import json
 import hashlib
 import datetime as dt
 from functools import wraps
-
 import requests
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -12,9 +11,6 @@ import psycopg2
 from psycopg2 import pool as psycopool
 from psycopg2.extras import RealDictCursor
 
-# ------------------------------------------------------------------------------
-# App & config
-# ------------------------------------------------------------------------------
 app = Flask(__name__, static_folder=None)
 CORS(app, supports_credentials=False)
 
@@ -34,7 +30,7 @@ MM_PASS = os.getenv("MM_PASSWORD")
 db_pool: psycopool.SimpleConnectionPool | None = None
 
 # ------------------------------------------------------------------------------
-# DB bootstrap
+# DB setup
 # ------------------------------------------------------------------------------
 def init_db_pool():
     global db_pool
@@ -47,11 +43,7 @@ def init_db_pool():
             db_pool = psycopool.SimpleConnectionPool(
                 minconn=1,
                 maxconn=8,
-                host=DB_CFG["host"],
-                port=DB_CFG["port"],
-                dbname=DB_CFG["dbname"],
-                user=DB_CFG["user"],
-                password=DB_CFG["password"],
+                **DB_CFG
             )
             conn = db_pool.getconn()
             with conn, conn.cursor() as cur:
@@ -72,18 +64,15 @@ def ensure_schema():
         with conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_advisory_lock(420420);")
-                cur.execute(
-                    """
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS app_users (
                         id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                         username TEXT UNIQUE NOT NULL,
                         pin_hash TEXT NOT NULL,
                         created_at TIMESTAMPTZ DEFAULT NOW()
                     );
-                    """
-                )
-                cur.execute(
-                    """
+                """)
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS events (
                         id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                         user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
@@ -96,8 +85,7 @@ def ensure_schema():
                         created_at TIMESTAMPTZ DEFAULT NOW(),
                         updated_at TIMESTAMPTZ DEFAULT NOW()
                     );
-                    """
-                )
+                """)
                 cur.execute("SELECT pg_advisory_unlock(420420);")
     finally:
         db_pool.putconn(conn)
@@ -105,21 +93,18 @@ def ensure_schema():
 # ------------------------------------------------------------------------------
 # Auth helpers
 # ------------------------------------------------------------------------------
-def _hash_pin(username: str, pin: str) -> str:
-    blob = (username + ":" + pin + ":" + APP_SECRET).encode("utf-8")
-    return hashlib.sha256(blob).hexdigest()
+def _hash_pin(username, pin):
+    return hashlib.sha256(f"{username}:{pin}:{APP_SECRET}".encode()).hexdigest()
 
-
-def _sign(payload: dict) -> str:
-    data = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-    sig = hashlib.sha256((data + APP_SECRET).encode("utf-8")).hexdigest()
+def _sign(payload):
+    data = json.dumps(payload, separators=(",", ":"))
+    sig = hashlib.sha256((data + APP_SECRET).encode()).hexdigest()
     return f"{data}.{sig}"
 
-
-def _verify(token: str) -> dict | None:
+def _verify(token):
     try:
         data, sig = token.rsplit(".", 1)
-        expect = hashlib.sha256((data + APP_SECRET).encode("utf-8")).hexdigest()
+        expect = hashlib.sha256((data + APP_SECRET).encode()).hexdigest()
         if sig != expect:
             return None
         payload = json.loads(data)
@@ -129,10 +114,8 @@ def _verify(token: str) -> dict | None:
     except Exception:
         return None
 
-
-def issue_token(user_id: int, username: str) -> str:
-    return _sign({"uid": user_id, "username": username, "exp": time.time() + 60 * 60 * 24 * 7})
-
+def issue_token(uid, username):
+    return _sign({"uid": uid, "username": username, "exp": time.time() + 60 * 60 * 24 * 7})
 
 def require_auth(fn):
     @wraps(fn)
@@ -148,101 +131,100 @@ def require_auth(fn):
     return wrapper
 
 # ------------------------------------------------------------------------------
-# External helpers (Meteomatics + NASA POWER)
+# External APIs
 # ------------------------------------------------------------------------------
-def get_meteomatics_summary(lat: float, lon: float, date_iso: str):
+def get_meteomatics_summary(lat, lon, date_iso):
+    """Fetch Meteomatics hourly data and compute summary."""
     if not MM_USER or not MM_PASS:
+        print("[Meteomatics] Missing credentials")
         return None
     try:
         d0 = dt.datetime.fromisoformat(date_iso)
-        start = d0.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = start + dt.timedelta(days=1) - dt.timedelta(seconds=1)
-        params = "t_2m:C,precipitation_1h:mm,wind_speed_10m:ms,relative_humidity_2m:p,cloud_cover:p"
-        url = (
-            f"https://api.meteomatics.com/"
-            f"{start.strftime('%Y-%m-%dT%H:%M:%SZ')}--{end.strftime('%Y-%m-%dT%H:%M:%SZ')}:PT1H/"
-            f"{params}/{lat:.4f},{lon:.4f}/json"
-        )
-        r = requests.get(url, auth=(MM_USER, MM_PASS), timeout=12)
+        start = d0.strftime("%Y-%m-%dT00:00:00Z")
+        end = d0.strftime("%Y-%m-%dT23:59:59Z")
+        params = "t_2m:C,precipitation_1h:mm,wind_speed_10m:ms"
+        url = f"https://api.meteomatics.com/{start}--{end}:PT1H/{params}/{lat:.4f},{lon:.4f}/json"
+        r = requests.get(url, auth=(MM_USER, MM_PASS), timeout=15)
+        print(f"[Meteomatics] URL={url} STATUS={r.status_code}")
         if r.status_code != 200:
+            print("[Meteomatics error]", r.text[:200])
             return None
         js = r.json()
-        def vals(key):
-            for p in js.get("data", []):
-                if p.get("parameter") == key:
-                    pts = p.get("coordinates", [{}])[0].get("dates", [])
-                    return [pt["value"] for pt in pts if "value" in pt]
-            return []
-        t = vals("t_2m:C"); pr = vals("precipitation_1h:mm"); ws = vals("wind_speed_10m:ms")
-        rh = vals("relative_humidity_2m:p"); cc = vals("cloud_cover:p")
-        if not any([t, pr, ws, rh, cc]): return None
+        # Try flexible parsing
+        data = js.get("data", [])
+        values = {p["parameter"]: [d["value"] for d in p["coordinates"][0]["dates"] if "value" in d]
+                  for p in data if p.get("coordinates")}
+        t = values.get("t_2m:C", [])
+        pr = values.get("precipitation_1h:mm", [])
+        ws = values.get("wind_speed_10m:ms", [])
+        if not (t or pr or ws):
+            print("[Meteomatics] No numeric data parsed.")
+            return None
         return {
             "t_max": max(t) if t else None,
             "t_min": min(t) if t else None,
             "precip_24h": sum(pr) if pr else 0.0,
             "wind_max": max(ws) if ws else None,
-            "rh_mean": sum(rh)/len(rh) if rh else None,
-            "cloud_mean": sum(cc)/len(cc) if cc else None,
-            "source": "meteomatics",
+            "source": "meteomatics"
         }
-    except Exception:
+    except Exception as e:
+        print("[Meteomatics Exception]", e)
         return None
 
-
-def get_nasa_power(lat: float, lon: float, date_iso: str):
+def get_nasa_power(lat, lon, date_iso):
     try:
         d = dt.datetime.fromisoformat(date_iso)
         url = (
             "https://power.larc.nasa.gov/api/temporal/daily/point"
-            f"?parameters=T2M_MAX,T2M_MIN,PRECTOTCORR,ALLSKY_SFC_SW_DWN"
+            f"?parameters=T2M_MAX,T2M_MIN,PRECTOTCORR"
             f"&community=RE&longitude={lon:.4f}&latitude={lat:.4f}"
             f"&start={d.strftime('%Y%m%d')}&end={d.strftime('%Y%m%d')}&format=JSON"
         )
-        r = requests.get(url, timeout=12)
-        if r.status_code != 200: return None
-        js = r.json()
-        data = js.get("properties", {}).get("parameter", {})
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            print("[NASA POWER error]", r.status_code, r.text[:100])
+            return None
+        data = r.json().get("properties", {}).get("parameter", {})
         tmax = list(data.get("T2M_MAX", {}).values())[0]
         tmin = list(data.get("T2M_MIN", {}).values())[0]
         precip = list(data.get("PRECTOTCORR", {}).values())[0]
-        solar = list(data.get("ALLSKY_SFC_SW_DWN", {}).values())[0]
-        avg_temp = (tmax + tmin) / 2
-        return {"tmax":tmax,"tmin":tmin,"precip":precip,"solar":solar,"avg_temp":avg_temp,"source":"nasa_power"}
-    except Exception:
+        return {"tmax": tmax, "tmin": tmin, "precip": precip, "source": "nasa_power"}
+    except Exception as e:
+        print("[NASA POWER Exception]", e)
         return None
 
-
-def interpret_conditions(metrics: dict | None, event_name: str):
+def interpret_conditions(metrics, event_name):
     if not metrics:
-        return "mixed conditions", ["umbrella just in case","water bottle","sunscreen"]
+        return "mixed conditions", ["umbrella just in case", "water bottle", "sunscreen"]
+    tmax = metrics.get("t_max")
+    rain = metrics.get("precip_24h", 0)
+    wind = metrics.get("wind_max")
+    if tmax and tmax >= 33:
+        label = "very hot"
+    elif rain >= 10:
+        label = "very wet"
+    elif wind and wind >= 10:
+        label = "very windy"
+    elif tmax and tmax <= 18:
+        label = "cool"
+    else:
+        label = "fair"
     tips = []
-    tmax = metrics.get("t_max"); rain = metrics.get("precip_24h",0); wind = metrics.get("wind_max")
-    if tmax and tmax>=33: label="very hot"
-    elif rain>=10: label="very wet"
-    elif wind and wind>=10: label="very windy"
-    elif tmax and tmax<=18: label="cool"
-    else: label="fair"
-    if label=="very hot": tips+=["pack extra ice","bring shade/canopy","portable fans","electrolytes"]
-    if label=="very wet": tips+=["bring umbrellas/raincoats","waterproof bags","consider backup shelter"]
-    if label=="very windy": tips+=["secure tents/props","avoid drone flights","check wind gusts"]
-    e=(event_name or "").lower()
-    if any(k in e for k in["picnic","bbq","barbecue","beach","park"]): tips+=["cooler with ice","sunscreen","ground sheet"]
-    elif any(k in e for k in["hike","trail","trek"]): tips+=["hydration pack","insect repellent","trail shoes"]
-    elif any(k in e for k in["drone","flying","aerial"]): tips+=["spare batteries","ND filters","check NOTAM/no-fly zones"]
-    elif any(k in e for k in["wedding","ceremony","outdoor event","party"]): tips+=["confirm canopy vendor","confirm indoor fallback"]
-    seen=set(); tips=[t for t in tips if not (t in seen or seen.add(t))]
-    return label,tips
+    if label == "very hot": tips += ["shade", "hydration"]
+    if label == "very wet": tips += ["raincoat", "waterproof gear"]
+    if label == "very windy": tips += ["secure tents"]
+    if label == "cool": tips += ["light jacket"]
+    return label, tips
 
-
-def reverse_geocode(lat: float, lon: float):
+def reverse_geocode(lat, lon):
     try:
         r = requests.get("https://nominatim.openstreetmap.org/reverse",
-                         params={"format":"jsonv2","lat":lat,"lon":lon,"zoom":10,"addressdetails":1},
-                         headers={"User-Agent":"Plan4Cast/1.0"},timeout=8)
-        if r.status_code!=200: return {}
-        js=r.json(); addr=js.get("address",{})
-        city=addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county")
-        return {"city":city,"country":addr.get("country")}
+                         params={"format": "jsonv2", "lat": lat, "lon": lon},
+                         headers={"User-Agent": "Plan4Cast/1.0"}, timeout=8)
+        if r.status_code != 200:
+            return {}
+        js = r.json().get("address", {})
+        return {"city": js.get("city") or js.get("town") or js.get("village"), "country": js.get("country")}
     except Exception:
         return {}
 
@@ -250,141 +232,102 @@ def reverse_geocode(lat: float, lon: float):
 # Routes
 # ------------------------------------------------------------------------------
 @app.get("/health")
-def health(): return jsonify({"ok":True,"ts":time.time()})
+def health():
+    return jsonify({"ok": True, "ts": time.time()})
 
 @app.post("/signup")
 def signup():
-    init_db_pool(); data=request.get_json(force=True)
-    username=(data.get("username") or "").strip().lower(); pin=(data.get("pin") or "").strip()
-    if not username or not pin.isdigit() or len(pin)!=4: return jsonify({"error":"invalid username or pin"}),400
-    pin_hash=_hash_pin(username,pin)
-    conn=db_pool.getconn()
+    init_db_pool()
+    data = request.get_json(force=True)
+    username = (data.get("username") or "").strip().lower()
+    pin = (data.get("pin") or "").strip()
+    if not username or not pin.isdigit() or len(pin) != 4:
+        return jsonify({"error": "invalid username or pin"}), 400
+    pin_hash = _hash_pin(username, pin)
+    conn = db_pool.getconn()
     try:
-        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("INSERT INTO app_users (username,pin_hash) VALUES (%s,%s) ON CONFLICT (username) DO NOTHING RETURNING id;",
-                        (username,pin_hash)); row=cur.fetchone()
+        with conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "INSERT INTO app_users (username, pin_hash) VALUES (%s,%s) ON CONFLICT DO NOTHING RETURNING id;",
+                (username, pin_hash),
+            )
+            row = cur.fetchone()
             if not row:
-                cur.execute("SELECT id,pin_hash FROM app_users WHERE username=%s;",(username,))
-                row2=cur.fetchone()
-                if not row2 or row2["pin_hash"]!=pin_hash: return jsonify({"error":"username already exists"}),409
-                user_id=row2["id"]
-            else: user_id=row["id"]
-    finally: db_pool.putconn(conn)
-    return jsonify({"ok":True,"token":issue_token(user_id,username)})
+                cur.execute("SELECT id, pin_hash FROM app_users WHERE username=%s;", (username,))
+                row2 = cur.fetchone()
+                if not row2 or row2["pin_hash"] != pin_hash:
+                    return jsonify({"error": "username already exists"}), 409
+                uid = row2["id"]
+            else:
+                uid = row["id"]
+    finally:
+        db_pool.putconn(conn)
+    return jsonify({"ok": True, "token": issue_token(uid, username)})
 
 @app.post("/login")
 def login():
-    init_db_pool(); data=request.get_json(force=True)
-    username=(data.get("username") or "").strip().lower(); pin=(data.get("pin") or "").strip()
-    if not username or not pin.isdigit() or len(pin)!=4: return jsonify({"error":"invalid credentials"}),400
-    pin_hash=_hash_pin(username,pin)
-    conn=db_pool.getconn()
+    init_db_pool()
+    data = request.get_json(force=True)
+    username = (data.get("username") or "").strip().lower()
+    pin = (data.get("pin") or "").strip()
+    pin_hash = _hash_pin(username, pin)
+    conn = db_pool.getconn()
     try:
-        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT id,pin_hash FROM app_users WHERE username=%s;",(username,))
-            row=cur.fetchone()
-            if not row or row["pin_hash"]!=pin_hash: return jsonify({"error":"invalid credentials"}),401
-            user_id=row["id"]
-    finally: db_pool.putconn(conn)
-    return jsonify({"ok":True,"token":issue_token(user_id,username)})
-
-@app.get("/events")
-@require_auth
-def list_events(user):
-    init_db_pool(); conn=db_pool.getconn()
-    try:
-        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT id,event_name,date::text AS date,city,country,lat,lon FROM events WHERE user_id=%s ORDER BY date ASC,id ASC;",(user["uid"],))
-            return jsonify(cur.fetchall())
-    finally: db_pool.putconn(conn)
-
-@app.post("/events")
-@require_auth
-def create_event(user):
-    init_db_pool(); d=request.get_json(force=True)
-    name=(d.get("event_name") or "").strip(); date=(d.get("date") or "").strip()
-    city=(d.get("city") or "").strip() or None; country=(d.get("country") or "").strip() or None
-    lat=d.get("lat"); lon=d.get("lon")
-    if not name or not date: return jsonify({"error":"missing fields"}),400
-    conn=db_pool.getconn()
-    try:
-        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("INSERT INTO events (user_id,event_name,date,city,country,lat,lon) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id,event_name,date::text,city,country,lat,lon;",
-                        (user["uid"],name,date,city,country,lat,lon))
-            return jsonify(cur.fetchone()),201
-    finally: db_pool.putconn(conn)
-
-@app.put("/events/<int:event_id>")
-@require_auth
-def update_event(user,event_id:int):
-    init_db_pool(); d=request.get_json(force=True)
-    name=(d.get("event_name") or "").strip(); date=(d.get("date") or "").strip()
-    city=(d.get("city") or "").strip() or None; country=(d.get("country") or "").strip() or None
-    lat=d.get("lat"); lon=d.get("lon")
-    if not name or not date: return jsonify({"error":"missing fields"}),400
-    conn=db_pool.getconn()
-    try:
-        with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("UPDATE events SET event_name=%s,date=%s,city=%s,country=%s,lat=%s,lon=%s,updated_at=NOW() WHERE id=%s AND user_id=%s RETURNING id,event_name,date::text,city,country,lat,lon;",
-                        (name,date,city,country,lat,lon,event_id,user["uid"]))
-            row=cur.fetchone()
-            if not row: return jsonify({"error":"not found"}),404
-            return jsonify(row)
-    finally: db_pool.putconn(conn)
+        with conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, pin_hash FROM app_users WHERE username=%s;", (username,))
+            row = cur.fetchone()
+            if not row or row["pin_hash"] != pin_hash:
+                return jsonify({"error": "invalid credentials"}), 401
+            uid = row["id"]
+    finally:
+        db_pool.putconn(conn)
+    return jsonify({"ok": True, "token": issue_token(uid, username)})
 
 @app.post("/suggest")
 @require_auth
 def suggest(user):
-    d=request.get_json(force=True)
-    event_name=(d.get("event_name") or "").strip(); date=d.get("date"); lat=d.get("lat"); lon=d.get("lon")
-    event_id=d.get("event_id")
-    if event_id:
-        conn=db_pool.getconn()
-        try:
-            with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT event_name,date::text,lat,lon,city,country FROM events WHERE id=%s AND user_id=%s;",(event_id,user["uid"]))
-                row=cur.fetchone()
-                if not row: return jsonify({"error":"event not found"}),404
-                event_name=event_name or row["event_name"]; date=date or row["date"]
-                lat=lat if lat is not None else row["lat"]; lon=lon if lon is not None else row["lon"]
-        finally: db_pool.putconn(conn)
-    mm=None; nasa=None
-    if date and (lat is not None) and (lon is not None):
-        try: mm=get_meteomatics_summary(float(lat),float(lon),date)
-        except Exception: mm=None
-        try: nasa=get_nasa_power(float(lat),float(lon),date)
-        except Exception: nasa=None
-    label,tips=interpret_conditions(mm,event_name)
-    context=None
-    if nasa and mm and mm.get("t_max") and nasa.get("avg_temp"):
-        diff=mm["t_max"]-nasa["avg_temp"]
-        if diff>3: context="Hotter than usual"
-        elif diff<-3: context="Cooler than usual"
-        else: context="Typical for this location"
-    return jsonify({"predicted":label,"advice":tips,"metrics":mm or {},"nasa_power":nasa or {},"context":context,
-                    "note":"Forecast fused from Meteomatics and NASA POWER climatology."})
+    data = request.get_json(force=True)
+    event_name = (data.get("event_name") or "").strip()
+    date = data.get("date")
+    lat = data.get("lat")
+    lon = data.get("lon")
+    print(f"\n=== Suggest for {event_name} ({date}) ===")
+    print(f"Coordinates: {lat},{lon}")
+
+    mm = get_meteomatics_summary(float(lat), float(lon), date) if (lat and lon and date) else None
+    nasa = get_nasa_power(float(lat), float(lon), date) if (lat and lon and date) else None
+    print("Meteomatics data:", mm)
+    print("NASA POWER data:", nasa)
+
+    label, tips = interpret_conditions(mm, event_name)
+    return jsonify({
+        "predicted": label,
+        "advice": tips,
+        "metrics": mm or {},
+        "nasa_power": nasa or {},
+        "note": "Forecast fused from Meteomatics and NASA POWER climatology."
+    })
 
 @app.get("/reverse_geocode")
 def api_reverse_geocode():
-    lat=request.args.get("lat",type=float); lon=request.args.get("lon",type=float)
-    if lat is None or lon is None: return jsonify({})
-    return jsonify(reverse_geocode(lat,lon))
+    lat = request.args.get("lat", type=float)
+    lon = request.args.get("lon", type=float)
+    return jsonify(reverse_geocode(lat, lon))
 
-# ------------------------------------------------------------------------------
-# Serve static frontend
-# ------------------------------------------------------------------------------
 @app.get("/")
-def root(): return send_from_directory("/app/static","index.html")
+def root():
+    return send_from_directory("/app/static", "index.html")
 
 @app.get("/<path:path>")
 def static_proxy(path):
-    try: return send_from_directory("/app/static",path)
-    except Exception: return jsonify({"error":"not found"}),404
+    try:
+        return send_from_directory("/app/static", path)
+    except Exception:
+        return jsonify({"error": "not found"}), 404
 
 # ------------------------------------------------------------------------------
 # Startup
 # ------------------------------------------------------------------------------
 init_db_pool()
-
-if __name__=="__main__":
-    app.run(host="0.0.0.0",port=8000,debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000, debug=True)
