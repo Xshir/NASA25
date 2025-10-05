@@ -7,8 +7,6 @@ from psycopg2 import pool as psycopool
 from psycopg2.extras import RealDictCursor
 
 # ------------------------------------------------------------------------------
-# App setup
-# ------------------------------------------------------------------------------
 app = Flask(__name__, static_folder=None)
 CORS(app, supports_credentials=False)
 app.logger.setLevel(logging.INFO)
@@ -24,11 +22,8 @@ DB_CFG = dict(
     user=os.getenv("POSTGRES_USER", "nasa2025"),
     password=os.getenv("POSTGRES_PASSWORD", "nasa2025"),
 )
-
 db_pool: psycopg2.pool.SimpleConnectionPool | None = None
 
-# ------------------------------------------------------------------------------
-# DB init
 # ------------------------------------------------------------------------------
 def init_db_pool():
     global db_pool
@@ -123,7 +118,7 @@ def require_auth(fn):
     return wrapper
 
 # ------------------------------------------------------------------------------
-# External data
+# External weather data
 # ------------------------------------------------------------------------------
 def get_meteomatics_summary(lat: float, lon: float, date_iso: str):
     """Fetch Meteomatics daily summary (free-tier safe)."""
@@ -139,7 +134,6 @@ def get_meteomatics_summary(lat: float, lon: float, date_iso: str):
         if r.status_code != 200:
             app.logger.warning(f"[Meteomatics body] {r.text[:200]}")
             return None
-
         js = r.json()
         data = {p["parameter"]: p["coordinates"][0]["dates"][0]["value"]
                 for p in js.get("data", []) if p.get("coordinates")}
@@ -176,58 +170,47 @@ def get_nasa_power(lat: float, lon: float, date_iso: str):
         tmin = list(param.get("T2M_MIN", {}).values())[0]
         precip = list(param.get("PRECTOTCORR", {}).values())[0]
         solar = list(param.get("ALLSKY_SFC_SW_DWN", {}).values())[0]
-        out = {"tmax": tmax, "tmin": tmin, "avg_temp": (tmax + tmin)/2.0, "precip": precip, "solar": solar, "source": "nasa_power"}
+        out = {"tmax": tmax, "tmin": tmin, "avg_temp": (tmax + tmin)/2.0,
+               "precip": precip, "solar": solar, "source": "nasa_power"}
         app.logger.info(f"[NASA POWER] {out}")
         return out
     except Exception as e:
         app.logger.error(f"[NASA EXC] {e}")
         return None
 
+# ------------------------------------------------------------------------------
 def interpret_conditions(m, event_name: str):
+    """Convert metrics + event name into readable prediction + tips."""
     if not m:
-        return "mixed conditions", ["umbrella just in case", "water bottle", "sunscreen"]
-    tmax = m.get("t_max"); rain = m.get("precip_24h", 0)
+        return "mixed conditions", ["bring umbrella just in case", "water bottle", "sunscreen"]
+
+    tips = []
+    tmax = m.get("t_max"); rain = m.get("precip_24h", 0) or 0
     if tmax is not None and tmax >= 33: label = "very hot"
     elif rain >= 10: label = "very wet"
     elif tmax is not None and tmax <= 18: label = "cool"
     else: label = "fair"
-    tips = []
-    if label == "very hot": tips += ["shade", "fans", "hydration"]
-    if label == "very wet": tips += ["umbrella", "raincoat"]
+
+    # Base tips by weather
+    if label == "very hot": tips += ["bring shade/canopy", "portable fans", "stay hydrated"]
+    if label == "very wet": tips += ["raincoat", "waterproof bag", "check shelter options"]
     if label == "cool": tips += ["light jacket"]
+
+    # Event-specific context
+    e = (event_name or "").lower()
+    if any(k in e for k in ["drone", "flying", "aerial"]):
+        tips += ["check wind before flight", "bring ND filters", "spare batteries", "consider skipping if winds exceed 10 m/s"]
+    elif any(k in e for k in ["wedding", "ceremony", "party"]):
+        tips += ["confirm canopy vendor", "backup indoor location", "protect photo gear"]
+    elif any(k in e for k in ["picnic", "bbq", "beach", "park"]):
+        tips += ["cooler with ice", "sunscreen", "ground mat"]
+    elif any(k in e for k in ["hike", "trail", "trek"]):
+        tips += ["hydration pack", "insect repellent", "trail shoes"]
+
+    seen = set()
+    tips = [t for t in tips if not (t in seen or seen.add(t))]
     return label, tips
 
-def reverse_geocode(lat: float, lon: float):
-    try:
-        r = requests.get("https://nominatim.openstreetmap.org/reverse",
-                         params={"format":"jsonv2","lat":lat,"lon":lon,"zoom":10,"addressdetails":1},
-                         headers={"User-Agent":"Plan4Cast/1.0"}, timeout=8)
-        if r.status_code != 200: return {}
-        addr = r.json().get("address", {})
-        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county")
-        return {"city": city, "country": addr.get("country")}
-    except Exception: return {}
-
-# ------------------------------------------------------------------------------
-# JSON error handlers
-# ------------------------------------------------------------------------------
-def _wants_json():
-    a = request.headers.get("Accept",""); c = request.headers.get("Content-Type","")
-    return ("application/json" in a) or ("application/json" in c)
-
-@app.errorhandler(404)
-def _404(e):
-    if _wants_json(): return jsonify({"error":"not found"}),404
-    if request.method=="GET": return send_from_directory("/app/static","index.html")
-    return "Not found",404
-
-@app.errorhandler(500)
-def _500(e):
-    app.logger.error(f"[500] {e}")
-    return (jsonify({"error":"server error"}),500) if _wants_json() else ("Server error",500)
-
-# ------------------------------------------------------------------------------
-# Routes
 # ------------------------------------------------------------------------------
 @app.get("/health")
 def health(): return jsonify({"ok": True, "ts": time.time()})
@@ -323,17 +306,34 @@ def suggest(user):
         mm=get_meteomatics_summary(float(lat),float(lon),date)
         nasa=get_nasa_power(float(lat),float(lon),date)
     app.logger.info(f"[/suggest] mm={mm} nasa={nasa}")
+
     label,tips=interpret_conditions(mm,event_name)
-    return jsonify({"predicted":label,"advice":tips,"metrics":mm or {},"nasa_power":nasa or {}})
+    # Compose readable weather stats for UI
+    stats_text=None
+    if mm:
+        tmax=mm.get("t_max"); rain=mm.get("precip_24h",0)
+        if tmax is not None:
+            stats_text=f"(Max {tmax:.1f}°C, Rain {rain:.1f} mm)"
+    elif nasa:
+        stats_text=f"(Max {nasa.get('tmax',0):.1f}°C, Rain {nasa.get('precip',0):.1f} mm)"
+
+    return jsonify({
+        "predicted": f"{label} {stats_text or ''}".strip(),
+        "advice": tips,
+        "metrics": mm or {},
+        "nasa_power": nasa or {},
+        "note": "Forecast fused from Meteomatics and NASA POWER climatology."
+    })
 
 @app.get("/reverse_geocode")
 def api_reverse_geocode():
     lat=request.args.get("lat",type=float); lon=request.args.get("lon",type=float)
     if lat is None or lon is None: return jsonify({})
-    return jsonify(reverse_geocode(lat,lon))
+    try:
+        r=reverse_geocode(lat,lon)
+        return jsonify(r)
+    except Exception: return jsonify({})
 
-# ------------------------------------------------------------------------------
-# Static frontend
 # ------------------------------------------------------------------------------
 @app.get("/")
 def root(): return send_from_directory("/app/static","index.html")
@@ -341,7 +341,7 @@ def root(): return send_from_directory("/app/static","index.html")
 @app.get("/<path:path>")
 def static_proxy(path):
     try: return send_from_directory("/app/static",path)
-    except Exception: return _404(None)
+    except Exception: return jsonify({"error":"not found"}),404
 
 # ------------------------------------------------------------------------------
 init_db_pool()
