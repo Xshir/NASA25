@@ -5,126 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Plan4Cast — Event Weather Planner</title>
   <style>
-    :root{
-      --bg1:#07090e; --bg2:#0f1624;
-      --panel:#121a27; --panel-2:#1b2636;
-      --teal:#66fcf1; --mint:#45a29e;
-      --muted:#b7c3dc; --stroke:#2d3a4d; --accent:#2b3442;
-    }
+    :root{--bg1:#07090e;--bg2:#0f1624;--panel:#121a27;--panel-2:#1b2636;--teal:#66fcf1;--mint:#45a29e;--muted:#b7c3dc;--stroke:#2d3a4d;--accent:#2b3442}
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{
-      font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;
-      margin:0; color:#eaf5ff;
-      background:
-        radial-gradient(1200px 600px at 10% -10%, #0a1930 0%, transparent 60%),
-        radial-gradient(1000px 500px at 90% 110%, #08212f 0%, transparent 55%),
-        linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
-      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-    }
-
-    #app{
-      min-height:100dvh;
-      display:flex; flex-direction:column; align-items:center;
-      padding:24px 16px 72px;
-      transition:filter .25s ease, opacity .25s ease;
-    }
-    #app.blurred{ filter:blur(14px) saturate(80%) brightness(.82); }
-
-    h1{color:var(--teal); margin:.2rem 0 .3rem; letter-spacing:.4px}
-    h2{color:var(--mint); margin:1rem 0 .6rem}
+    body{font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;margin:0;color:#eaf5ff;background:radial-gradient(1200px 600px at 10% -10%, #0a1930 0%, transparent 60%),radial-gradient(1000px 500px at 90% 110%, #08212f 0%, transparent 55%),linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+    #app{min-height:100dvh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 72px;transition:filter .25s ease, opacity .25s ease}
+    #app.blurred{filter:blur(14px) saturate(80%) brightness(.82)}
+    h1{color:var(--teal);margin:.2rem 0 .3rem;letter-spacing:.4px}
+    h2{color:var(--mint);margin:1rem 0 .6rem}
     .muted{color:var(--muted)}
     .tagline{margin-top:-2px;text-align:center}
-
-    .card{
-      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
-      border:1px solid rgba(255,255,255,.06);
-      backdrop-filter: blur(6px);
-      width:min(95vw,760px);
-      border-radius:14px; padding:18px 20px; margin:12px 0;
-      box-shadow:0 12px 36px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.02);
-      transition:transform .05s ease;
-    }
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.06);backdrop-filter: blur(6px);width:min(95vw,760px);border-radius:14px;padding:18px 20px;margin:12px 0;box-shadow:0 12px 36px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.02);transition:transform .05s ease}
     .card:active{transform:translateY(1px)}
     .hidden{display:none}
-
-    .header{
-      display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center;
-      padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.08);
-    }
-    .time{font-size:1.25rem; font-weight:700}
-    .loc{font-size:.95rem; color:var(--muted); min-height:1.2em}
-    .wx{font-size:.95rem; opacity:.9}
-
-    .btn{
-      padding:.55rem .9rem; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem;
-      transition:transform .05s ease, background .2s ease, box-shadow .2s ease;
-      box-shadow:none;
-    }
+    .header{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+    .time{font-size:1.25rem;font-weight:700}
+    .loc{font-size:.95rem;color:var(--muted);min-height:1.2em}
+    .wx{font-size:.95rem;opacity:.9}
+    .btn{padding:.55rem .9rem;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:.95rem;transition:transform .05s ease, background .2s ease, box-shadow .2s ease;box-shadow:none}
     .btn:active{transform:translateY(1px)}
-    .btn-primary{background:var(--mint); color:#0b0c10;}
-    .btn-primary:hover{background:var(--teal); box-shadow:0 10px 24px rgba(102,252,241,.25);}
-    .btn-ghost{background:#223043; color:#e6f7f6; border:1px solid var(--stroke)}
-    .btn-ghost:hover{background:#2a3b53; box-shadow:0 10px 24px rgba(0,0,0,.25);}
-
+    .btn-primary{background:var(--mint);color:#0b0c10}
+    .btn-primary:hover{background:var(--teal);box-shadow:0 10px 24px rgba(102,252,241,.25)}
+    .btn-ghost{background:#223043;color:#e6f7f6;border:1px solid var(--stroke)}
+    .btn-ghost:hover{background:#2a3b53;box-shadow:0 10px 24px rgba(0,0,0,.25)}
     .list{margin-top:.5rem}
-    .item{
-      display:grid; grid-template-columns:1fr auto; gap:.6rem; align-items:center;
-      padding:.7rem .35rem; border-bottom:1px solid rgba(255,255,255,.06);
-    }
-    .item-title{font-weight:700; letter-spacing:.2px}
-    .item-sub{color:var(--muted); font-size:.95rem}
-    .btn-row{display:flex; gap:.45rem}
-
-    .modal{
-      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1000;
-      background:rgba(9,14,22,.55);
-      animation:fadeIn .18s ease;
-    }
+    .item{display:grid;grid-template-columns:1fr auto;gap:.6rem;align-items:center;padding:.7rem .35rem;border-bottom:1px solid rgba(255,255,255,.06)}
+    .item-title{font-weight:700;letter-spacing:.2px}
+    .item-sub{color:var(--muted);font-size:.95rem}
+    .btn-row{display:flex;gap:.45rem}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:1000;background:rgba(9,14,22,.55);animation:fadeIn .18s ease}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-    .sheet{
-      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:16px; width:min(92vw,560px); padding:18px;
-      box-shadow:0 20px 60px rgba(0,0,0,.5);
-    }
-    .row{display:grid; gap:.9rem}
+    .sheet{background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.10);border-radius:16px;width:min(92vw,560px);padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+    .row{display:grid;gap:.9rem}
     .row-2{grid-template-columns:1fr 1fr}
-    label{font-size:.92rem; color:var(--muted); display:block; margin:.2rem 0 .35rem}
-    input,select{
-      width:100%; padding:.65rem .75rem; border:1px solid var(--stroke); border-radius:10px;
-      background:#0f1928; color:#fff; font-size:1rem; outline:none;
-      box-shadow:0 3px 0 rgba(0,0,0,.25) inset;
-    }
-
-    .date-line{display:flex; align-items:center; gap:.8rem}
-    .date-label{min-width:150px; color:var(--muted)}
-    .date-wrap{position:relative; width:46px; height:46px}
-    .icon-btn{
-      width:46px; height:46px; border-radius:12px; background:#213247; border:1px solid var(--stroke);
-      display:flex; align-items:center; justify-content:center;
-    }
+    label{font-size:.92rem;color:var(--muted);display:block;margin:.2rem 0 .35rem}
+    input,select{width:100%;padding:.65rem .75rem;border:1px solid var(--stroke);border-radius:10px;background:#0f1928;color:#fff;font-size:1rem;outline:none;box-shadow:0 3px 0 rgba(0,0,0,.25) inset}
+    .date-line{display:flex;align-items:center;gap:.8rem}
+    .date-label{min-width:150px;color:var(--muted)}
+    .date-wrap{position:relative;width:46px;height:46px}
+    .icon-btn{width:46px;height:46px;border-radius:12px;background:#213247;border:1px solid var(--stroke);display:flex;align-items:center;justify-content:center}
     .icon-btn:hover{background:#2a3b53}
-    .date-overlay{position:absolute; inset:0; opacity:0; cursor:pointer}
+    .date-overlay{position:absolute;inset:0;opacity:0;cursor:pointer}
     .calendar-emoji{font-size:20px}
-
-    #cityOther{margin-top:.4rem}
-
-    #gate{ position:fixed; inset:0; background:rgba(5,10,18,.92); display:none; align-items:center; justify-content:center; z-index:1500; }
-    #gate .panel{ background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,520px); }
+    #gate{position:fixed;inset:0;background:rgba(5,10,18,.92);display:none;align-items:center;justify-content:center;z-index:1500}
+    #gate .panel{background:var(--panel-2);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:24px;width:min(92vw,520px)}
     #gate ul{margin:.5rem 0 .75rem 1.2rem}
-    #weatherBar{ position:fixed; bottom:0; left:0; right:0; text-align:center; padding:.55rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(18,27,41,.92); font-size:.92rem }
-
-    #loaderOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3000;
-      background:rgba(10,15,25,.75); backdrop-filter:blur(8px); }
-    .loader{ width:64px; height:64px; border:4px solid rgba(255,255,255,.25); border-top:4px solid var(--teal);
-      border-radius:50%; animation:spin 1s linear infinite; }
-    @keyframes spin{ to{ transform:rotate(360deg) } }
-
-    #welcomeOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3500;
-      background:rgba(10,15,25,.95); color:#fff; flex-direction:column; transition:opacity 1.5s ease; }
-    #welcomeOverlay h2{ font-size:2rem; color:var(--teal); margin:0; }
+    #weatherBar{position:fixed;bottom:0;left:0;right:0;text-align:center;padding:.55rem;border-top:1px solid rgba(255,255,255,.08);background:rgba(18,27,41,.92);font-size:.92rem}
+    #loaderOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:3000;background:rgba(10,15,25,.75);backdrop-filter:blur(8px)}
+    .loader{width:64px;height:64px;border:4px solid rgba(255,255,255,.25);border-top:4px solid var(--teal);border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #welcomeOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:3500;background:rgba(10,15,25,.95);color:#fff;flex-direction:column;transition:opacity 1.5s ease}
+    #welcomeOverlay h2{font-size:2rem;color:var(--teal);margin:0}
   </style>
 </head>
 <body>
@@ -132,7 +63,6 @@
     <h1>Plan4Cast</h1>
     <p class="muted tagline">Powered By NASA's POWER Dataset & Meteomatics API</p>
 
-    <!-- LOGIN -->
     <div id="loginCard" class="card">
       <h2>Login</h2>
       <div class="row">
@@ -140,11 +70,10 @@
         <input id="loginPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
         <button class="btn btn-primary" onclick="login()">Login</button>
         <p id="loginMsg"></p>
-        <p class="muted">Don’t have an account? <a href="#" onclick="showSignup()" style="color:var(--teal); text-decoration:none">Sign up</a></p>
+        <p class="muted">Don’t have an account? <a href="#" onclick="showSignup()" style="color:var(--teal);text-decoration:none">Sign up</a></p>
       </div>
     </div>
 
-    <!-- SIGNUP -->
     <div id="signupCard" class="card hidden">
       <h2>Sign Up</h2>
       <div class="row">
@@ -152,11 +81,10 @@
         <input id="signupPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
         <button class="btn btn-primary" onclick="signup()">Create Account</button>
         <p id="signupMsg"></p>
-        <p class="muted">Already have an account? <a href="#" onclick="showLogin()" style="color:var(--teal); text-decoration:none">Login</a></p>
+        <p class="muted">Already have an account? <a href="#" onclick="showLogin()" style="color:var(--teal);text-decoration:none">Login</a></p>
       </div>
     </div>
 
-    <!-- HOME -->
     <div id="homeCard" class="card hidden">
       <div class="header">
         <div>
@@ -170,12 +98,11 @@
       <h2 style="margin-top:1rem;">Upcoming Events</h2>
       <div id="eventsList" class="list"></div>
 
-      <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+      <div style="margin-top:12px;display:flex;justify-content:flex-end;">
         <button class="btn btn-ghost" onclick="logout()">Logout</button>
       </div>
     </div>
 
-    <!-- EVENT DETAILS -->
     <div id="eventCard" class="card hidden">
       <button onclick="showHome()" class="btn btn-ghost" style="float:right;">← Back</button>
       <h2 id="eventTitle">Event</h2>
@@ -187,10 +114,9 @@
     </div>
   </div>
 
-  <!-- Planner modal -->
   <div id="planner" class="modal">
     <div class="sheet">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
         <h2 id="plannerTitle">Plan New Event</h2>
         <button class="btn btn-ghost" onclick="closePlanner()">✕</button>
       </div>
@@ -220,11 +146,10 @@
           <div>
             <label for="citySelect">City</label>
             <select id="citySelect"></select>
-            <input id="cityOther" class="hidden" placeholder="Enter city" />
           </div>
         </div>
 
-        <div style="display:flex; gap:.6rem; justify-content:flex-end; margin-top:.4rem;">
+        <div style="display:flex;gap:.6rem;justify-content:flex-end;margin-top:.4rem;">
           <button class="btn btn-ghost" onclick="closePlanner()">Cancel</button>
           <button id="saveBtn" class="btn btn-primary" onclick="saveEvent()">Save</button>
         </div>
@@ -234,7 +159,6 @@
     </div>
   </div>
 
-  <!-- Location gate -->
   <div id="gate">
     <div class="panel">
       <h2>Location is required</h2>
@@ -243,7 +167,7 @@
         <li>If you previously selected <b>Block</b>, allow location for this site in your browser settings.</li>
         <li>Then come back and tap <b>Ask for location</b>.</li>
       </ul>
-      <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="askForLocation()">Ask for location</button>
         <button class="btn btn-ghost" onclick="openHelp()">How to allow</button>
       </div>
@@ -263,12 +187,11 @@
     let editingId = null;
     let COUNTRY_LIST = [];
     let SELECTED_COUNTRY_CODE = "";
-    let SELECTED_CITY_COORDS = null; // {lat, lon}
 
-    function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")); }
-    function showLogin(){ hideAll(); document.getElementById("loginCard").classList.remove("hidden"); }
-    function showSignup(){ hideAll(); document.getElementById("signupCard").classList.remove("hidden"); }
-    function showHome(){ hideAll(); document.getElementById("homeCard").classList.remove("hidden"); fetchEvents(); }
+    function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")) }
+    function showLogin(){ hideAll(); document.getElementById("loginCard").classList.remove("hidden") }
+    function showSignup(){ hideAll(); document.getElementById("signupCard").classList.remove("hidden") }
+    function showHome(){ hideAll(); document.getElementById("homeCard").classList.remove("hidden"); fetchEvents() }
 
     function showLoader(show=true){
       document.getElementById("loaderOverlay").style.display = show ? "flex" : "none";
@@ -280,8 +203,8 @@
       document.getElementById("welcomeText").textContent = `Welcome, ${username}`;
       w.style.display = "flex";
       document.getElementById("app").classList.add("blurred");
-      setTimeout(()=>{ w.style.opacity = "0"; document.getElementById("app").classList.remove("blurred"); }, 1200);
-      setTimeout(()=>{ w.style.display = "none"; showHome(); }, 2100);
+      setTimeout(()=>{ w.style.opacity = "0"; document.getElementById("app").classList.remove("blurred") }, 1200);
+      setTimeout(()=>{ w.style.display = "none"; showHome() }, 2100);
     }
 
     window.addEventListener("load", async () => {
@@ -299,7 +222,7 @@
       const r = await fetch(`${API_BASE}/signup`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
       const data = await r.json();
       showLoader(false);
-      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); welcome(username); }
+      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); welcome(username) }
       else document.getElementById("signupMsg").textContent=data.error||"Signup failed";
     }
     async function login(){
@@ -309,10 +232,10 @@
       const r = await fetch(`${API_BASE}/login`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
       const data = await r.json();
       showLoader(false);
-      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); welcome(username); }
+      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); welcome(username) }
       else document.getElementById("loginMsg").textContent=data.error||"Login failed";
     }
-    function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin(); }
+    function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin() }
 
     function tickClock(){
       const now = new Date();
@@ -321,7 +244,7 @@
       document.getElementById("clock").textContent = `${hh}:${mm}`;
     }
 
-    function askForLocation(){ requestLocation(true); }
+    function askForLocation(){ requestLocation(true) }
 
     async function ensureGeoPermission(){
       const gateMsg = document.getElementById("gateMsg");
@@ -329,22 +252,13 @@
         if (navigator.permissions?.query){
           const status = await navigator.permissions.query({name:"geolocation"});
           const apply = () => {
-            if (status.state === "granted"){
-              hideGate(); requestLocation(false);
-            } else if (status.state === "prompt"){
-              showGate(); gateMsg.textContent = "Tap “Ask for location” to continue.";
-            } else {
-              showGate(); gateMsg.textContent = "Location is blocked for this site. Allow it in your browser settings, then tap “Ask for location”.";
-            }
+            if (status.state === "granted"){ hideGate(); requestLocation(false) }
+            else if (status.state === "prompt"){ showGate(); gateMsg.textContent = "Tap “Ask for location” to continue." }
+            else { showGate(); gateMsg.textContent = "Location is blocked for this site. Allow it in your browser settings, then tap “Ask for location”." }
           };
-          status.onchange = apply;
-          apply();
-        } else {
-          requestLocation(true);
-        }
-      } catch {
-        requestLocation(true);
-      }
+          status.onchange = apply; apply();
+        } else { requestLocation(true) }
+      } catch { requestLocation(true) }
     }
 
     function requestLocation(){
@@ -355,13 +269,8 @@
         await prefillLocation(latitude, longitude);
         updateCurrentWeather(latitude, longitude);
       }, (err)=>{
-        if (err?.code === err.PERMISSION_DENIED){
-          showGate();
-          document.getElementById("gateMsg").textContent = "Permission denied. Allow location for this site, then press “Ask for location”.";
-        } else {
-          showGate();
-          document.getElementById("gateMsg").textContent = "Unable to get location. Please try again.";
-        }
+        if (err?.code === err.PERMISSION_DENIED){ showGate(); document.getElementById("gateMsg").textContent = "Permission denied. Allow location for this site, then press “Ask for location”." }
+        else { showGate(); document.getElementById("gateMsg").textContent = "Unable to get location. Please try again." }
       }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
     }
 
@@ -380,7 +289,6 @@
         const data = await r.json();
         const loc = [data.city, data.country].filter(Boolean).join(", ");
         document.getElementById("locLine").textContent = loc || "";
-
         let code = data.country_code || "";
         if (!code && data.country){
           const hit = COUNTRY_LIST.find(c => c.name.toLowerCase() === data.country.toLowerCase());
@@ -389,30 +297,22 @@
         if (code){
           const sel = document.getElementById("countrySelect");
           if ([...sel.options].some(o => o.value === code)){
-            sel.value = code;
-            SELECTED_COUNTRY_CODE = code;
+            sel.value = code; SELECTED_COUNTRY_CODE = code;
             await loadCitiesForCountryCode(code, data.city || "");
           }
         }
-      }catch(e){
-        document.getElementById("locLine").textContent = "";
-      }
+      }catch(e){ document.getElementById("locLine").textContent = "" }
     }
-    function showGate(){ document.getElementById("gate").style.display="flex"; }
-    function hideGate(){ document.getElementById("gate").style.display="none"; }
+    function showGate(){ document.getElementById("gate").style.display="flex" }
+    function hideGate(){ document.getElementById("gate").style.display="none" }
 
     async function updateCurrentWeather(lat, lon){
       try{
         const r = await fetch(`/current_weather?lat=${lat}&lon=${lon}`);
         const data = await r.json();
-        if (data && typeof data.temp === "number"){
-          document.getElementById("wxNow").textContent = `Weather: ${data.temp.toFixed(1)}°C • ${data.desc || "—"}`;
-        } else {
-          document.getElementById("wxNow").textContent = "Weather: —";
-        }
-      }catch(e){
-        document.getElementById("wxNow").textContent = "Weather: —";
-      }
+        if (data && typeof data.temp === "number"){ document.getElementById("wxNow").textContent = `Weather: ${data.temp.toFixed(1)}°C • ${data.desc || "—"}` }
+        else { document.getElementById("wxNow").textContent = "Weather: —" }
+      }catch(e){ document.getElementById("wxNow").textContent = "Weather: —" }
     }
 
     async function loadCountries(){
@@ -420,111 +320,56 @@
         const r = await fetch(`/geo/countries`);
         const list = await r.json();
         COUNTRY_LIST = Array.isArray(list) ? list : [];
-      }catch{ COUNTRY_LIST = []; }
-
+      }catch{ COUNTRY_LIST = [] }
       const sel = document.getElementById("countrySelect");
       sel.innerHTML = "";
       const ph = document.createElement("option");
       ph.value = ""; ph.textContent = "Select country…"; ph.disabled = true; ph.selected = true;
       sel.appendChild(ph);
-
-      COUNTRY_LIST.forEach(c=>{
-        const o = document.createElement("option");
-        o.value = c.code; o.textContent = c.name;
-        sel.appendChild(o);
-      });
-
-      sel.onchange = async ()=>{
-        const code = sel.value;
-        SELECTED_COUNTRY_CODE = code;
-        SELECTED_CITY_COORDS = null;
-        await loadCitiesForCountryCode(code, "");
-      };
+      COUNTRY_LIST.forEach(c=>{ const o=document.createElement("option"); o.value=c.code; o.textContent=c.name; sel.appendChild(o) });
+      sel.onchange = async ()=>{ const code = sel.value; SELECTED_COUNTRY_CODE = code; await loadCitiesForCountryCode(code, "") };
     }
 
     async function loadCitiesForCountryCode(code, preferCity=""){
       const citySel = document.getElementById("citySelect");
-      const cityOther = document.getElementById("cityOther");
       citySel.innerHTML = "";
       citySel.disabled = false;
-      cityOther.classList.add("hidden");
-      cityOther.value = "";
-      SELECTED_CITY_COORDS = null;
-
-      if (code === "SG"){
-        const o = document.createElement("option");
-        o.value = "Singapore"; o.textContent = "Singapore"; o.selected = true;
-        citySel.appendChild(o);
-        citySel.disabled = true;
-        await geocodeCity("Singapore", "Singapore");
-        return;
-      }
-
       try{
         showLoader(true);
         const r = await fetch(`/geo/cities?code=${encodeURIComponent(code)}`);
         const data = await r.json();
-        const cities = data.cities || [];
-        citySel.innerHTML = "";
-
+        const cities = Array.isArray(data.cities) ? data.cities : [];
         const o0=document.createElement("option");
         o0.value=""; o0.textContent="Select city…"; o0.disabled=true; o0.selected=true;
         citySel.appendChild(o0);
-
-        cities.forEach(n=>{
+        cities.forEach(c=>{
           const o=document.createElement("option");
-          o.value=n; o.textContent=n;
+          o.value=c.name;
+          o.textContent=c.name;
+          o.dataset.lat=c.lat;
+          o.dataset.lon=c.lon;
           citySel.appendChild(o);
         });
-
-        const oX=document.createElement("option");
-        oX.value="__other"; oX.textContent="Other (type manually)";
-        citySel.appendChild(oX);
-
-        citySel.onchange = async ()=>{
-          if (citySel.value === "__other"){
-            cityOther.classList.remove("hidden");
-            SELECTED_CITY_COORDS = null;
-          }else if (citySel.value){
-            cityOther.classList.add("hidden");
-            await geocodeCity(citySel.value, getCountryNameByCode(code));
+        if (preferCity){
+          const hit = [...citySel.options].find(op => op.value.toLowerCase() === preferCity.toLowerCase());
+          if (hit){ citySel.value = hit.value }
+        }
+        citySel.onchange = ()=>{
+          const opt = citySel.selectedOptions[0];
+          if(opt && opt.dataset.lat && opt.dataset.lon){
+            window.currentCoords = {lat: parseFloat(opt.dataset.lat), lon: parseFloat(opt.dataset.lon)};
           }
         };
-
-        if (preferCity && cities.includes(preferCity)){
-          citySel.value = preferCity;
-          await geocodeCity(preferCity, getCountryNameByCode(code));
+        const cur = citySel.selectedOptions[0];
+        if (cur && cur.dataset.lat && cur.dataset.lon){
+          window.currentCoords = {lat: parseFloat(cur.dataset.lat), lon: parseFloat(cur.dataset.lon)};
         }
       }catch(e){
         citySel.innerHTML = "";
         const o0=document.createElement("option");
         o0.value=""; o0.textContent="(No cities available)"; o0.disabled=true; o0.selected=true;
         citySel.appendChild(o0);
-      } finally {
-        showLoader(false);
-      }
-    }
-
-    function getCountryNameByCode(code){
-      const m = COUNTRY_LIST.find(c=>c.code===code);
-      return m ? m.name : "";
-    }
-
-    async function geocodeCity(city, country){
-      try{
-        const q = encodeURIComponent(`${city}, ${country}`);
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${q}`,{
-          headers:{'Accept':'application/json'}
-        });
-        const arr = await res.json();
-        if(arr && arr[0]){
-          SELECTED_CITY_COORDS = { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon) };
-        } else {
-          SELECTED_CITY_COORDS = null;
-        }
-      } catch {
-        SELECTED_CITY_COORDS = null;
-      }
+      } finally { showLoader(false) }
     }
 
     function openPlanner(mode="create", ev=null){
@@ -532,18 +377,13 @@
       editingId = ev?.id ?? null;
       document.getElementById("plannerTitle").textContent = mode==="edit" ? "Edit Event" : "Plan New Event";
       document.getElementById("eventMsg").textContent = "";
-
       document.getElementById("eventName").value = ev?.event_name || "";
       currentDateISO = ev?.date || "";
       document.getElementById("eventDate").value = currentDateISO;
       setDateLabel(currentDateISO);
-
       const sel = document.getElementById("countrySelect");
       if (!sel.value && SELECTED_COUNTRY_CODE) sel.value = SELECTED_COUNTRY_CODE;
-      if (sel.value){
-        loadCitiesForCountryCode(sel.value, ev?.city || "");
-      }
-
+      if (sel.value){ loadCitiesForCountryCode(sel.value, ev?.city || "") }
       document.getElementById("planner").style.display = "flex";
       document.getElementById("app").classList.add("blurred");
     }
@@ -557,70 +397,44 @@
       const date = currentDateISO || document.getElementById("eventDate").value;
       const countryCode = document.getElementById("countrySelect").value;
       const citySel = document.getElementById("citySelect");
-      const cityOther = document.getElementById("cityOther");
+      const city = citySel.value;
       const msg = document.getElementById("eventMsg");
-
-      let city = "";
-      if (citySel.disabled){ city = citySel.value; }
-      else if (citySel.value === "__other"){ city = cityOther.value.trim(); }
-      else { city = citySel.value; }
-
-      if(!name || !date || !countryCode){
-        msg.textContent="Please provide event name, date, and country."; return;
+      if(!name || !date || !countryCode || !city){ msg.textContent="Please provide event name, date, country and city."; return }
+      const match = COUNTRY_LIST.find(c=>c.code===countryCode);
+      const countryName = match ? match.name : "";
+      const opt = citySel.selectedOptions[0];
+      if(opt && opt.dataset.lat && opt.dataset.lon){
+        window.currentCoords = {lat: parseFloat(opt.dataset.lat), lon: parseFloat(opt.dataset.lon)};
       }
-      const countryName = getCountryNameByCode(countryCode);
-
-      if (!window.currentCoords && !SELECTED_CITY_COORDS && city){
-        await geocodeCity(city, countryName);
-      }
-
-      const body = { event_name:name, date, country:countryName };
-      if (city) body.city = city;
-      if (window.currentCoords) { body.lat=window.currentCoords.lat; body.lon=window.currentCoords.lon; }
-      else if (SELECTED_CITY_COORDS) { body.lat=SELECTED_CITY_COORDS.lat; body.lon=SELECTED_CITY_COORDS.lon; }
-
+      const body = { event_name:name, date, country:countryName, city };
+      if (window.currentCoords) { body.lat=window.currentCoords.lat; body.lon=window.currentCoords.lon }
       try{
         showLoader(true);
         let r, data;
         if (plannerMode === "edit" && editingId){
-          r = await fetch(`/events/${editingId}`, {
-            method:"PUT",
-            headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` },
-            body: JSON.stringify(body)
-          });
+          r = await fetch(`/events/${editingId}`, { method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` }, body: JSON.stringify(body) });
           data = await r.json();
           if(!r.ok) throw new Error(data.error||"Update failed");
           closePlanner();
           await openEventDetails({ id: editingId, event_name:name, city, date, lat: body.lat, lon: body.lon });
         } else {
-          r = await fetch(`/events`, {
-            method:"POST",
-            headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` },
-            body: JSON.stringify(body)
-          });
+          r = await fetch(`/events`, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` }, body: JSON.stringify(body) });
           data = await r.json();
           if(!r.ok) throw new Error(data.error||"Create failed");
           closePlanner();
-          await openEventDetails({...data, lat: body.lat, lon: body.lon});
+          await openEventDetails(data);
         }
         await fetchEvents();
-      }catch(e){
-        msg.textContent = "Error: " + e.message;
-      } finally {
-        showLoader(false);
-      }
+      }catch(e){ msg.textContent = "Error: " + e.message } finally { showLoader(false) }
     }
 
     function wireDatePicker(){
       const dateInput = document.getElementById("eventDate");
-      dateInput.addEventListener("change", () => {
-        currentDateISO = dateInput.value;
-        setDateLabel(currentDateISO);
-      });
+      dateInput.addEventListener("change", () => { currentDateISO = dateInput.value; setDateLabel(currentDateISO) });
     }
     function setDateLabel(iso){
       const label = document.getElementById("dateLabel");
-      if(!iso){ label.textContent = "No date selected"; return; }
+      if(!iso){ label.textContent = "No date selected"; return }
       const d = new Date(iso + "T00:00:00");
       const day = d.getDate().toString().padStart(2,"0");
       const mo  = d.toLocaleString(undefined,{month:"short"});
@@ -628,7 +442,7 @@
       label.textContent = `${day} ${mo} ${yr}`;
     }
 
-    function toTitleCase(s){ return (s||"").replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()); }
+    function toTitleCase(s){ return (s||"").replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()) }
 
     async function fetchEvents(){
       showLoader(true);
@@ -657,17 +471,14 @@
       showLoader(true);
       document.getElementById("eventTitle").textContent = toTitleCase(e.event_name);
       document.getElementById("eventSub").textContent = `${e.date}${e.city ? " • " + e.city : ""}`;
-
       const body = e.id ? {event_id:e.id} : {event_name:e.event_name, date:e.date, lat:e.lat, lon:e.lon};
       const r = await fetch(`/suggest`, {method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${TOKEN}`}, body:JSON.stringify(body)});
       const data = await r.json();
-
       const headline = `<b>Predicted Weather:</b> ${data.predicted || "—"}`;
       document.getElementById("eventHeadline").innerHTML = headline;
       const tips = document.getElementById("eventTips"); tips.innerHTML="";
-      (data.advice||[]).forEach(t=>{ const li=document.createElement("li"); li.textContent=t; tips.appendChild(li); });
+      (data.advice||[]).forEach(t=>{ const li=document.createElement("li"); li.textContent=t; tips.appendChild(li) });
       document.getElementById("eventNote").textContent = data.note || "";
-
       showLoader(false);
       hideAll(); document.getElementById("eventCard").classList.remove("hidden");
     }
