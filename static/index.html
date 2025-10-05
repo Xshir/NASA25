@@ -18,7 +18,7 @@
       margin:0; color:#eaf5ff;
       background:
         radial-gradient(1200px 600px at 10% -10%, #0a1930 0%, transparent 60%),
-        radial-gradient(1000px 500px at 90% 110%, #08212f 0%, transparent 55%),
+        radial-gradient(1000px 500px at 90% 110%, #08212f 0, transparent 55%),
         linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
       -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
     }
@@ -119,7 +119,7 @@
 <body>
   <div id="app">
     <h1>Plan4Cast</h1>
-    <p class="muted" style="margin-top:-2px;">Plan your perfect event — powered by NASA & Meteomatics</p>
+    <p class="muted" style="margin-top:-2px;">Powered By NASA's POWER Dataset & Meteomatics API</p>
 
     <!-- LOGIN -->
     <div id="loginCard" class="card">
@@ -150,7 +150,8 @@
       <div class="header">
         <div>
           <div class="time" id="clock">--:--</div>
-          <div class="loc" id="locLine">Locating…</div>
+          <!-- Location line: start empty; only show once resolved -->
+          <div class="loc" id="locLine"></div>
         </div>
         <div class="wx" id="wxNow">Weather: —</div>
         <button class="btn btn-primary" onclick="openPlanner('create')">Plan</button>
@@ -240,7 +241,8 @@
     </div>
   </div>
 
-  <div id="weatherBar">Requesting location permission…</div>
+  <!-- Bottom bar: fixed team label -->
+  <div id="weatherBar">Temasek Polytechnic Team 1</div>
 
   <script>
     // ---------- Globals & routing ----------
@@ -321,11 +323,9 @@
       navigator.geolocation.getCurrentPosition(async (pos)=>{
         const {latitude, longitude} = pos.coords;
         window.currentCoords = {lat:latitude, lon:longitude};
-        document.getElementById("weatherBar").textContent = `Location: (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
         hideGate();
         await prefillLocation(latitude, longitude);
-        // NEW: live current weather line
-        updateCurrentWeather(latitude, longitude);
+        updateCurrentWeather(latitude, longitude); // live current weather
       }, (err)=>{
         if (err?.code === err.PERMISSION_DENIED){
           showGate();
@@ -351,17 +351,19 @@
         const r = await fetch(`/reverse_geocode?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
         const data = await r.json();
         const loc = [data.city, data.country].filter(Boolean).join(", ");
-        document.getElementById("locLine").textContent = loc || "Location detected";
+        // Show location ONLY if we actually have one; otherwise keep blank
+        document.getElementById("locLine").textContent = loc || "";
         populateCountry(data.country||"");
         populateCity(data.city||"");
       }catch(e){
+        document.getElementById("locLine").textContent = "";
         populateCountry(""); populateCity("");
       }
     }
     function showGate(){ document.getElementById("gate").style.display="flex"; }
     function hideGate(){ document.getElementById("gate").style.display="none"; }
 
-    // ---------- Current Weather (NEW) ----------
+    // ---------- Current Weather (Home header) ----------
     async function updateCurrentWeather(lat, lon){
       try{
         const r = await fetch(`/current_weather?lat=${lat}&lon=${lon}`);
@@ -369,10 +371,10 @@
         if (data && typeof data.temp === "number"){
           document.getElementById("wxNow").textContent = `Weather: ${data.temp.toFixed(1)}°C • ${data.desc || "—"}`;
         } else {
-          document.getElementById("wxNow").textContent = "Weather: unavailable";
+          document.getElementById("wxNow").textContent = "Weather: —";
         }
       }catch(e){
-        document.getElementById("wxNow").textContent = "Weather: error";
+        document.getElementById("wxNow").textContent = "Weather: —";
       }
     }
 
