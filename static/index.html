@@ -6,300 +6,632 @@
   <title>Plan4Cast — Event Weather Planner</title>
   <style>
     :root{
-      --bg1:#07090e;--bg2:#0f1624;--panel:#121a27;--panel2:#1b2636;
-      --teal:#66fcf1;--mint:#45a29e;--muted:#b7c3dc;--stroke:#2d3a4d;
+      --bg1:#07090e; --bg2:#0f1624;
+      --panel:#121a27; --panel-2:#1b2636;
+      --teal:#66fcf1; --mint:#45a29e;
+      --muted:#b7c3dc; --stroke:#2d3a4d; --accent:#2b3442;
     }
     *{box-sizing:border-box}
-    html,body{height:100%;margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:#eaf5ff;
-      background:linear-gradient(180deg,var(--bg1),var(--bg2));overflow-x:hidden}
-    h1{color:var(--teal);margin:.4rem 0 .2rem;text-align:center;letter-spacing:.4px}
-    h2{color:var(--mint);margin:.8rem 0 .4rem}
+    html,body{height:100%}
+    body{
+      font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+      margin:0; color:#eaf5ff;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #0a1930 0%, transparent 60%),
+        radial-gradient(1000px 500px at 90% 110%, #08212f 0%, transparent 55%),
+        linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+
+    #app{
+      min-height:100dvh;
+      display:flex; flex-direction:column; align-items:center;
+      padding:24px 16px 72px;
+      transition:filter .25s ease, opacity .25s ease;
+    }
+    #app.blurred{ filter:blur(14px) saturate(80%) brightness(.82); }
+
+    h1{color:var(--teal); margin:.2rem 0 .3rem; letter-spacing:.4px}
+    h2{color:var(--mint); margin:1rem 0 .6rem}
     .muted{color:var(--muted)}
-    #app{min-height:100vh;display:flex;flex-direction:column;align-items:center;
-      padding:24px 16px 72px;transition:filter .3s ease,opacity .3s ease}
-    #app.blurred{filter:blur(8px) brightness(.8)}
-    .card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
-      backdrop-filter:blur(6px);border-radius:14px;padding:20px;margin:12px 0;
-      width:min(95vw,760px);box-shadow:0 8px 30px rgba(0,0,0,.35)}
+    .tagline{margin-top:-2px;text-align:center}
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.06);
+      backdrop-filter: blur(6px);
+      width:min(95vw,760px);
+      border-radius:14px; padding:18px 20px; margin:12px 0;
+      box-shadow:0 12px 36px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.02);
+      transition:transform .05s ease;
+    }
+    .card:active{transform:translateY(1px)}
     .hidden{display:none}
-    .btn{padding:.6rem 1rem;border:none;border-radius:10px;cursor:pointer;
-      font-weight:600;font-size:.95rem;transition:.2s}
-    .btn-primary{background:var(--mint);color:#0b0c10}
-    .btn-primary:hover{background:var(--teal)}
-    .btn-ghost{background:#223043;color:#e6f7f6;border:1px solid var(--stroke)}
-    .btn-ghost:hover{background:#2a3b53}
-    .header{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px}
-    .time{font-size:1.25rem;font-weight:700}
-    .loc{font-size:.95rem;color:var(--muted)}
-    .wx{font-size:.95rem;opacity:.9}
+
+    .header{
+      display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center;
+      padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .time{font-size:1.25rem; font-weight:700}
+    .loc{font-size:.95rem; color:var(--muted); min-height:1.2em}
+    .wx{font-size:.95rem; opacity:.9}
+
+    .btn{
+      padding:.55rem .9rem; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem;
+      transition:transform .05s ease, background .2s ease, box-shadow .2s ease;
+      box-shadow:none;
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn-primary{background:var(--mint); color:#0b0c10;}
+    .btn-primary:hover{background:var(--teal); box-shadow:0 10px 24px rgba(102,252,241,.25);}
+    .btn-ghost{background:#223043; color:#e6f7f6; border:1px solid var(--stroke)}
+    .btn-ghost:hover{background:#2a3b53; box-shadow:0 10px 24px rgba(0,0,0,.25);}
+
     .list{margin-top:.5rem}
-    .item{display:grid;grid-template-columns:1fr auto;align-items:center;
-      padding:.6rem .3rem;border-bottom:1px solid rgba(255,255,255,.06)}
-    .item-title{font-weight:700;letter-spacing:.2px;text-transform:capitalize}
-    .item-sub{color:var(--muted);font-size:.9rem}
-    .btn-row{display:flex;gap:.4rem}
-    #footer{position:fixed;bottom:0;left:0;right:0;text-align:center;
-      padding:.55rem;border-top:1px solid rgba(255,255,255,.08);
-      background:rgba(18,27,41,.92);font-size:.85rem;color:var(--muted)}
-    /* Modal/Loader */
-    #loader{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
-      backdrop-filter:blur(8px) brightness(.8);background:rgba(0,0,0,.4);z-index:9999}
-    .spinner{width:56px;height:56px;border:6px solid #66fcf1;border-top-color:transparent;
-      border-radius:50%;animation:spin 1s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
+    .item{
+      display:grid; grid-template-columns:1fr auto; gap:.6rem; align-items:center;
+      padding:.7rem .35rem; border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .item-title{font-weight:700; letter-spacing:.2px}
+    .item-sub{color:var(--muted); font-size:.95rem}
+    .btn-row{display:flex; gap:.45rem}
+
+    .modal{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1000;
+      background:rgba(9,14,22,.55);
+      animation:fadeIn .18s ease;
+    }
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .sheet{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px; width:min(92vw,560px); padding:18px;
+      box-shadow:0 20px 60px rgba(0,0,0,.5);
+    }
+    .row{display:grid; gap:.9rem}
+    .row-2{grid-template-columns:1fr 1fr}
+    label{font-size:.92rem; color:var(--muted); display:block; margin:.2rem 0 .35rem}
+    input,select{
+      width:100%; padding:.65rem .75rem; border:1px solid var(--stroke); border-radius:10px;
+      background:#0f1928; color:#fff; font-size:1rem; outline:none;
+      box-shadow:0 3px 0 rgba(0,0,0,.25) inset;
+    }
+
+    .date-line{display:flex; align-items:center; gap:.8rem}
+    .date-label{min-width:150px; color:var(--muted)}
+    .date-wrap{position:relative; width:46px; height:46px}
+    .icon-btn{
+      width:46px; height:46px; border-radius:12px; background:#213247; border:1px solid var(--stroke);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .icon-btn:hover{background:#2a3b53}
+    .date-overlay{position:absolute; inset:0; opacity:0; cursor:pointer}
+    .calendar-emoji{font-size:20px}
+
+    #cityOther{margin-top:.4rem}
+
+    #gate{ position:fixed; inset:0; background:rgba(5,10,18,.92); display:none; align-items:center; justify-content:center; z-index:1500; }
+    #gate .panel{ background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:24px; width:min(92vw,520px); }
+    #gate ul{margin:.5rem 0 .75rem 1.2rem}
+    #weatherBar{ position:fixed; bottom:0; left:0; right:0; text-align:center; padding:.55rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(18,27,41,.92); font-size:.92rem }
+
+    /* Loader overlay */
+    #loaderOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3000;
+      background:rgba(10,15,25,.75); backdrop-filter:blur(8px); }
+    .loader{ width:64px; height:64px; border:4px solid rgba(255,255,255,.25); border-top:4px solid var(--teal);
+      border-radius:50%; animation:spin 1s linear infinite; }
+    @keyframes spin{ to{ transform:rotate(360deg) } }
+
     /* Welcome overlay */
-    #welcome{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
-      background:rgba(0,0,0,.9);color:#fff;font-size:1.6rem;z-index:2000;opacity:1;
-      transition:opacity 1.2s ease}
-    #welcome.fade{opacity:0}
-    /* Assistant panel */
-    .assistant{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-      border-radius:16px;padding:16px;display:flex;gap:12px;align-items:flex-start;
-      box-shadow:0 0 15px rgba(102,252,241,.15);margin-top:.5rem}
-    .assistant-icon{width:38px;height:38px;border-radius:50%;background:var(--teal);
-      display:flex;align-items:center;justify-content:center;font-weight:700;color:#0b0c10}
-    .assistant-body{flex:1}
+    #welcomeOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3500;
+      background:rgba(10,15,25,.95); color:#fff; flex-direction:column; transition:opacity 1.5s ease; }
+    #welcomeOverlay h2{ font-size:2rem; color:var(--teal); margin:0; }
   </style>
 </head>
 <body>
-<div id="app">
-  <h1>Plan4Cast</h1>
-  <p class="muted" style="text-align:center;margin-top:-6px;">
-    Powered by NASA POWER Dataset & Meteomatics API
-  </p>
+  <div id="app">
+    <h1>Plan4Cast</h1>
+    <p class="muted tagline">Powered By NASA's POWER Dataset & Meteomatics API</p>
 
-  <!-- LOGIN -->
-  <div id="loginCard" class="card">
-    <h2>Login</h2>
-    <input id="loginUsername" placeholder="Username"/><br>
-    <input id="loginPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password"/><br>
-    <button class="btn btn-primary" onclick="login()">Login</button>
-    <p id="loginMsg"></p>
-    <p class="muted">No account? <a href="#" onclick="showSignup()" style="color:var(--teal)">Sign up</a></p>
-  </div>
-
-  <!-- SIGNUP -->
-  <div id="signupCard" class="card hidden">
-    <h2>Sign Up</h2>
-    <input id="signupUsername" placeholder="Username"/><br>
-    <input id="signupPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password"/><br>
-    <button class="btn btn-primary" onclick="signup()">Create Account</button>
-    <p id="signupMsg"></p>
-    <p class="muted">Have an account? <a href="#" onclick="showLogin()" style="color:var(--teal)">Login</a></p>
-  </div>
-
-  <!-- HOME -->
-  <div id="homeCard" class="card hidden">
-    <div class="header">
-      <div>
-        <div class="time" id="clock">--:--</div>
-        <div class="loc" id="locLine"></div>
+    <!-- LOGIN -->
+    <div id="loginCard" class="card">
+      <h2>Login</h2>
+      <div class="row">
+        <input id="loginUsername" placeholder="Username" autocomplete="off" />
+        <input id="loginPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
+        <button class="btn btn-primary" onclick="login()">Login</button>
+        <p id="loginMsg"></p>
+        <p class="muted">Don’t have an account? <a href="#" onclick="showSignup()" style="color:var(--teal); text-decoration:none">Sign up</a></p>
       </div>
-      <div class="wx" id="wxNow"></div>
-      <button class="btn btn-primary" onclick="openPlanner('create')">Plan</button>
     </div>
-    <h2 style="margin-top:1rem;">Upcoming Events</h2>
-    <div id="eventsList" class="list"></div>
-    <div style="margin-top:12px;text-align:right">
-      <button class="btn btn-ghost" onclick="logout()">Logout</button>
-    </div>
-  </div>
 
-  <!-- EVENT -->
-  <div id="eventCard" class="card hidden">
-    <button class="btn btn-ghost" style="float:right" onclick="showHome()">← Back</button>
-    <h2 id="eventTitle">Event</h2>
-    <p id="eventSub" class="muted"></p>
-    <div id="assistantBox" class="assistant">
-      <div class="assistant-icon">A</div>
-      <div class="assistant-body">
-        <p id="eventHeadline" style="margin:.3rem 0 .4rem;font-weight:600"></p>
-        <ul id="eventTips"></ul>
-        <p id="eventNote" class="muted"></p>
+    <!-- SIGNUP -->
+    <div id="signupCard" class="card hidden">
+      <h2>Sign Up</h2>
+      <div class="row">
+        <input id="signupUsername" placeholder="Choose username" autocomplete="off" />
+        <input id="signupPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" type="password" />
+        <button class="btn btn-primary" onclick="signup()">Create Account</button>
+        <p id="signupMsg"></p>
+        <p class="muted">Already have an account? <a href="#" onclick="showLogin()" style="color:var(--teal); text-decoration:none">Login</a></p>
       </div>
+    </div>
+
+    <!-- HOME -->
+    <div id="homeCard" class="card hidden">
+      <div class="header">
+        <div>
+          <div class="time" id="clock">--:--</div>
+          <div class="loc" id="locLine"></div>
+        </div>
+        <div class="wx" id="wxNow">Weather: —</div>
+        <button class="btn btn-primary" onclick="openPlanner('create')">Plan</button>
+      </div>
+
+      <h2 style="margin-top:1rem;">Upcoming Events</h2>
+      <div id="eventsList" class="list"></div>
+
+      <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <!-- EVENT DETAILS -->
+    <div id="eventCard" class="card hidden">
+      <button onclick="showHome()" class="btn btn-ghost" style="float:right;">← Back</button>
+      <h2 id="eventTitle">Event</h2>
+      <p id="eventSub" class="muted">Date & Location</p>
+      <p id="eventHeadline" style="margin:.2rem 0 .6rem;"></p>
+      <h3>Recommendation Notes:</h3>
+      <ul id="eventTips"></ul>
+      <p class="muted" id="eventNote"></p>
     </div>
   </div>
 
   <!-- Planner modal -->
-  <div id="planner" class="card hidden" style="position:fixed;top:10%;z-index:1000;">
-    <h2 id="plannerTitle">Plan New Event</h2>
-    <input id="eventName" placeholder="Event name"/><br>
-    <label>Date</label>
-    <input id="eventDate" type="date"/><br>
-    <label>Country</label>
-    <select id="countrySelect"></select><br>
-    <label>City</label>
-    <select id="citySelect"></select>
-    <input id="cityOther" class="hidden" placeholder="Other city"/><br>
-    <div style="text-align:right">
-      <button class="btn btn-ghost" onclick="closePlanner()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveEvent()">Save</button>
+  <div id="planner" class="modal">
+    <div class="sheet">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 id="plannerTitle">Plan New Event</h2>
+        <button class="btn btn-ghost" onclick="closePlanner()">✕</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="eventName">Event name</label>
+          <input id="eventName" />
+        </div>
+
+        <div>
+          <label>Date</label>
+          <div class="date-line">
+            <span class="date-label" id="dateLabel">No date selected</span>
+            <div class="date-wrap">
+              <button class="icon-btn" title="Pick date"><span class="calendar-emoji">📅</span></button>
+              <input id="eventDate" type="date" class="date-overlay" />
+            </div>
+          </div>
+        </div>
+
+        <div class="row row-2">
+          <div>
+            <label for="countrySelect">Country</label>
+            <select id="countrySelect"></select>
+          </div>
+          <div>
+            <label for="citySelect">City</label>
+            <select id="citySelect"></select>
+            <input id="cityOther" class="hidden" placeholder="Enter city" />
+          </div>
+        </div>
+
+        <div style="display:flex; gap:.6rem; justify-content:flex-end; margin-top:.4rem;">
+          <button class="btn btn-ghost" onclick="closePlanner()">Cancel</button>
+          <button id="saveBtn" class="btn btn-primary" onclick="saveEvent()">Save</button>
+        </div>
+
+        <p id="eventMsg"></p>
+      </div>
     </div>
-    <p id="eventMsg"></p>
   </div>
-</div>
 
-<!-- Loader + Welcome + Footer -->
-<div id="loader"><div class="spinner"></div></div>
-<div id="welcome"><span id="welcomeMsg"></span></div>
-<div id="footer">Temasek Polytechnic Team 1 (AEL/AEG/BME) + SP EEE</div>
+  <!-- Location gate -->
+  <div id="gate">
+    <div class="panel">
+      <h2>Location is required</h2>
+      <p class="muted">We use your location to tailor weather guidance for your plans.</p>
+      <ul class="muted">
+        <li>If you previously selected <b>Block</b>, allow location for this site in your browser settings.</li>
+        <li>Then come back and tap <b>Ask for location</b>.</li>
+      </ul>
+      <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="askForLocation()">Ask for location</button>
+        <button class="btn btn-ghost" onclick="openHelp()">How to allow</button>
+      </div>
+      <p id="gateMsg" class="muted" style="margin-top:.6rem;"></p>
+    </div>
+  </div>
 
-<script>
-const API="";let TOKEN=localStorage.getItem("token")||null;let plannerMode="create",editingId=null;
-function hideAll(){document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"))}
-function showLogin(){hideAll();loginCard.classList.remove("hidden")}
-function showSignup(){hideAll();signupCard.classList.remove("hidden")}
-function showHome(){hideAll();homeCard.classList.remove("hidden");fetchEvents()}
-function showEvent(){hideAll();eventCard.classList.remove("hidden")}
-function showLoader(b){document.getElementById("loader").style.display=b?"flex":"none"}
-function titleCase(s){return s.replace(/\w\S*/g,t=>t[0].toUpperCase()+t.substr(1).toLowerCase())}
+  <div id="weatherBar">Temasek Polytechnic Team 1 (AEL/AEG/BME) + SP EEE</div>
+  <div id="loaderOverlay"><div class="loader"></div></div>
+  <div id="welcomeOverlay"><h2 id="welcomeText"></h2></div>
 
-window.addEventListener("load",()=>{
-  tickClock();setInterval(tickClock,1000);
-  if(TOKEN)showWelcome();else showLogin();
-  loadCountries();
-});
-function tickClock(){const n=new Date();
-  clock.textContent=`${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;}
+  <script>
+    // ---------- Globals & routing ----------
+    const API_BASE = "";
+    let TOKEN = localStorage.getItem("token") || null;
+    let currentDateISO = "";
+    let plannerMode = "create";
+    let editingId = null;
+    let COUNTRY_LIST = []; // [{name,code}]
+    let SELECTED_COUNTRY_CODE = "";
 
-async function signup(){
-  const username=signupUsername.value.trim().toLowerCase(),pin=signupPin.value.trim();
-  const r=await fetch(`/signup`,{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username,pin})});const d=await r.json();
-  if(d.ok){TOKEN=d.token;localStorage.setItem("token",TOKEN);showWelcome();}
-  else signupMsg.textContent=d.error||"Signup failed";
-}
-async function login(){
-  const username=loginUsername.value.trim().toLowerCase(),pin=loginPin.value.trim();
-  const r=await fetch(`/login`,{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username,pin})});const d=await r.json();
-  if(d.ok){TOKEN=d.token;localStorage.setItem("token",TOKEN);showWelcome();}
-  else loginMsg.textContent=d.error||"Login failed";
-}
-function logout(){TOKEN=null;localStorage.removeItem("token");showLogin()}
+    function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")); }
+    function showLogin(){ hideAll(); document.getElementById("loginCard").classList.remove("hidden"); }
+    function showSignup(){ hideAll(); document.getElementById("signupCard").classList.remove("hidden"); }
+    function showHome(){ hideAll(); document.getElementById("homeCard").classList.remove("hidden"); fetchEvents(); }
 
-function showWelcome(){
-  welcomeMsg.textContent=`Welcome, ${localStorage.getItem("lastUser")||"User"}!`;
-  welcome.style.display="flex";app.classList.add("blurred");
-  setTimeout(()=>welcome.classList.add("fade"),1000);
-  setTimeout(()=>{welcome.style.display="none";app.classList.remove("blurred");showHome();},2200);
-}
-
-async function fetchEvents(){
-  showLoader(true);
-  const r=await fetch(`/events`,{headers:{Authorization:`Bearer ${TOKEN}`}});
-  const data=await r.json();const list=eventsList;list.innerHTML="";
-  if(!Array.isArray(data)||!data.length){list.innerHTML="<div class='muted'>No events yet.</div>";showLoader(false);return;}
-  data.forEach(e=>{
-    const row=document.createElement("div");row.className="item";
-    const left=document.createElement("div");
-    left.innerHTML=`<div class='item-title'>${titleCase(e.event_name)}</div><div class='item-sub'>${e.date}${e.city?" • "+e.city:""}</div>`;
-    const btns=document.createElement("div");btns.className="btn-row";
-    const v=document.createElement("button");v.className="btn btn-primary";v.textContent="View";
-    v.onclick=()=>openEventDetails(e);
-    const ed=document.createElement("button");ed.className="btn btn-ghost";ed.textContent="Edit";
-    ed.onclick=()=>openPlanner('edit',e);
-    btns.appendChild(v);btns.appendChild(ed);row.appendChild(left);row.appendChild(btns);list.appendChild(row);
-  });
-  showLoader(false);
-}
-
-async function openEventDetails(e){
-  showLoader(true);
-  eventTitle.textContent=titleCase(e.event_name);
-  eventSub.textContent=`${e.date}${e.city?" • "+e.city:""}`;
-  const body=e.id?{event_id:e.id}:{event_name:e.event_name,date:e.date,lat:e.lat,lon:e.lon};
-  const r=await fetch(`/suggest`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${TOKEN}`},body:JSON.stringify(body)});
-  const d=await r.json();
-  eventHeadline.textContent=`Predicted Weather: ${d.predicted||"—"}`;
-  eventTips.innerHTML="";
-  (d.advice||[]).forEach(t=>{const li=document.createElement("li");li.textContent=t;eventTips.appendChild(li)});
-  eventNote.textContent=`Recommendation Notes: ${d.note||""}`;
-  showLoader(false);showEvent();
-}
-
-/* Planner */
-async function openPlanner(mode="create",ev=null){
-  plannerMode=mode;editingId=ev?.id||null;plannerTitle.textContent=mode==="edit"?"Edit Event":"Plan New Event";
-  eventMsg.textContent="";eventName.value=ev?.event_name||"";eventDate.value=ev?.date||"";
-  countrySelect.value="";citySelect.innerHTML="";cityOther.value="";
-  planner.classList.remove("hidden");await loadCountries(ev?.country||"");if(ev?.country_code)await loadCities(ev.country_code,ev.city);
-}
-function closePlanner(){planner.classList.add("hidden")}
-async function saveEvent(){
-  const name=eventName.value.trim(),date=eventDate.value,cc=countrySelect.value;
-  let city=citySelect.value==="__OTHER__"?cityOther.value.trim():citySelect.value;
-  if(!name||!date||!cc){eventMsg.textContent="Please fill all fields.";return;}
-  const country=countrySelect.options[countrySelect.selectedIndex].text;
-  const body={event_name:name,date,city,country};
-  if(window.currentCoords){body.lat=currentCoords.lat;body.lon=currentCoords.lon;}
-  showLoader(true);
-  const r=await fetch(plannerMode==="edit"?`/events/${editingId}`:"/events",{method:plannerMode==="edit"?"PUT":"POST",
-    headers:{"Content-Type":"application/json",Authorization:`Bearer ${TOKEN}`},body:JSON.stringify(body)});
-  const d=await r.json();
-  showLoader(false);
-  if(!r.ok){eventMsg.textContent=d.error||"Save failed";return;}
-  closePlanner();fetchEvents();openEventDetails(d);
-}
-
-/* Country/City */
-async function loadCountries(sel=""){
-  const r=await fetch("/geo/countries");const d=await r.json();countrySelect.innerHTML="";
-  d.forEach(c=>{const o=document.createElement("option");o.value=c.code;o.textContent=c.name;if(c.name===sel)o.selected=true;countrySelect.appendChild(o)});
-  countrySelect.onchange=()=>loadCities(countrySelect.value);
-}
-async function loadCities(code,prefer=""){
-  showLoader(true);
-  const r=await fetch(`/geo/cities?code=${encodeURIComponent(code)}`);const d=await r.json();
-  citySelect.innerHTML="";const list=d.cities||[];
-  if(d.cityless){const o=document.createElement("option");o.textContent=list[0];o.value=list[0];citySelect.appendChild(o);citySelect.disabled=true;}
-  else{citySelect.disabled=false;list.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;citySelect.appendChild(o)});
-    const oOther=document.createElement("option");oOther.value="__OTHER__";oOther.textContent="Other city…";citySelect.appendChild(oOther);
-    citySelect.onchange=()=>{if(citySelect.value==="__OTHER__")cityOther.classList.remove("hidden");else cityOther.classList.add("hidden")};}
-  showLoader(false);
-}
-
-/* Geolocation for weather header */
-navigator.geolocation.getCurrentPosition(async pos => {
-  window.currentCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-  try {
-    // Update current weather from backend
-    const cw = await fetch(`/current_weather?lat=${currentCoords.lat}&lon=${currentCoords.lon}`);
-    const data = await cw.json();
-    if (data && data.temp !== undefined) {
-      wxNow.textContent = `${data.desc} • ${data.temp.toFixed(1)}°C`;
-    } else {
-      wxNow.textContent = "";
+    function showLoader(show=true){
+      document.getElementById("loaderOverlay").style.display = show ? "flex" : "none";
+      document.getElementById("app").classList.toggle("blurred", show);
     }
 
-    // Reverse geocode to display user's location
-    const rev = await fetch(`/reverse_geocode?lat=${currentCoords.lat}&lon=${currentCoords.lon}`);
-    const loc = await rev.json();
-    if (loc.city || loc.country) {
-      locLine.textContent = [loc.city, loc.country].filter(Boolean).join(", ");
-    } else {
-      locLine.textContent = "";
+    function welcome(username){
+      const w = document.getElementById("welcomeOverlay");
+      document.getElementById("welcomeText").textContent = `Welcome, ${username}`;
+      w.style.display = "flex";
+      document.getElementById("app").classList.add("blurred");
+      setTimeout(()=>{ w.style.opacity = "0"; document.getElementById("app").classList.remove("blurred"); }, 1200);
+      setTimeout(()=>{ w.style.display = "none"; showHome(); }, 2100);
     }
 
-    // Prefill the planner form with detected country
-    if (loc.country_code) {
-      const csel = document.getElementById("countrySelect");
-      [...csel.options].forEach(o => {
-        if (o.value === loc.country_code) o.selected = true;
+    window.addEventListener("load", async () => {
+      tickClock(); setInterval(tickClock, 1000);
+      await loadCountries(); // populate countries first
+      ensureGeoPermission();
+      if (TOKEN) showHome(); else showLogin();
+      wireDatePicker();
+    });
+
+    // ---------- Auth ----------
+    async function signup(){
+      const username = document.getElementById("signupUsername").value.trim().toLowerCase();
+      const pin = document.getElementById("signupPin").value.trim();
+      showLoader(true);
+      const r = await fetch(`${API_BASE}/signup`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
+      const data = await r.json();
+      showLoader(false);
+      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); welcome(username); }
+      else document.getElementById("signupMsg").textContent=data.error||"Signup failed";
+    }
+    async function login(){
+      const username = document.getElementById("loginUsername").value.trim().toLowerCase();
+      const pin = document.getElementById("loginPin").value.trim();
+      showLoader(true);
+      const r = await fetch(`${API_BASE}/login`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,pin})});
+      const data = await r.json();
+      showLoader(false);
+      if(data.ok){ TOKEN=data.token; localStorage.setItem("token",TOKEN); welcome(username); }
+      else document.getElementById("loginMsg").textContent=data.error||"Login failed";
+    }
+    function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin(); }
+
+    // ---------- Clock ----------
+    function tickClock(){
+      const now = new Date();
+      const hh = now.getHours().toString().padStart(2,"0");
+      const mm = now.getMinutes().toString().padStart(2,"0");
+      document.getElementById("clock").textContent = `${hh}:${mm}`;
+    }
+
+    // ---------- Geolocation with prompt control ----------
+    function askForLocation(){ requestLocation(true); }
+
+    async function ensureGeoPermission(){
+      const gateMsg = document.getElementById("gateMsg");
+      try{
+        if (navigator.permissions?.query){
+          const status = await navigator.permissions.query({name:"geolocation"});
+          const apply = () => {
+            if (status.state === "granted"){
+              hideGate(); requestLocation(false);
+            } else if (status.state === "prompt"){
+              showGate(); gateMsg.textContent = "Tap “Ask for location” to continue.";
+            } else {
+              showGate(); gateMsg.textContent = "Location is blocked for this site. Allow it in your browser settings, then tap “Ask for location”.";
+            }
+          };
+          status.onchange = apply;
+          apply();
+        } else {
+          requestLocation(true);
+        }
+      } catch {
+        requestLocation(true);
+      }
+    }
+
+    function requestLocation(spawnPrompt=false){
+      navigator.geolocation.getCurrentPosition(async (pos)=>{
+        const {latitude, longitude} = pos.coords;
+        window.currentCoords = {lat:latitude, lon:longitude};
+        hideGate();
+        await prefillLocation(latitude, longitude);
+        updateCurrentWeather(latitude, longitude);
+      }, (err)=>{
+        if (err?.code === err.PERMISSION_DENIED){
+          showGate();
+          document.getElementById("gateMsg").textContent = "Permission denied. Allow location for this site, then press “Ask for location”.";
+        } else {
+          showGate();
+          document.getElementById("gateMsg").textContent = "Unable to get location. Please try again.";
+        }
+      }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+    }
+
+    function openHelp(){
+      const ua = navigator.userAgent.toLowerCase();
+      let url = "https://support.google.com/chrome/answer/142065?hl=en";
+      if (ua.includes("firefox")) url = "https://support.mozilla.org/en-US/kb/site-permissions";
+      else if (ua.includes("safari") && !ua.includes("chrome")) url = "https://support.apple.com/guide/safari/safo40501/mac";
+      else if (ua.includes("edg/")) url = "https://support.microsoft.com/topic/manage-location-permissions-in-microsoft-edge";
+      window.open(url, "_blank");
+    }
+
+    async function prefillLocation(lat,lon){
+      try{
+        const r = await fetch(`/reverse_geocode?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+        const data = await r.json();
+        const loc = [data.city, data.country].filter(Boolean).join(", ");
+        document.getElementById("locLine").textContent = loc || "";
+
+        // Best-effort preselect using country_code; fallback to name match
+        let code = data.country_code || "";
+        if (!code && data.country){
+          const hit = COUNTRY_LIST.find(c => c.name.toLowerCase() === data.country.toLowerCase());
+          if (hit) code = hit.code;
+        }
+        if (code){
+          const sel = document.getElementById("countrySelect");
+          if ([...sel.options].some(o => o.value === code)){
+            sel.value = code;
+            SELECTED_COUNTRY_CODE = code;
+            await loadCitiesForCountryCode(code, data.city || "");
+          }
+        }
+      }catch(e){
+        document.getElementById("locLine").textContent = "";
+      }
+    }
+    function showGate(){ document.getElementById("gate").style.display="flex"; }
+    function hideGate(){ document.getElementById("gate").style.display="none"; }
+
+    // ---------- Current Weather (Home header) ----------
+    async function updateCurrentWeather(lat, lon){
+      try{
+        const r = await fetch(`/current_weather?lat=${lat}&lon=${lon}`);
+        const data = await r.json();
+        if (data && typeof data.temp === "number"){
+          document.getElementById("wxNow").textContent = `Weather: ${data.temp.toFixed(1)}°C • ${data.desc || "—"}`;
+        } else {
+          document.getElementById("wxNow").textContent = "Weather: —";
+        }
+      }catch(e){
+        document.getElementById("wxNow").textContent = "Weather: —";
+      }
+    }
+
+    // ---------- Countries & Cities (ALL countries, preset cities) ----------
+    async function loadCountries(){
+      try{
+        const r = await fetch(`/geo/countries`);
+        const list = await r.json();
+        COUNTRY_LIST = Array.isArray(list) ? list : [];
+      }catch{ COUNTRY_LIST = []; }
+
+      const sel = document.getElementById("countrySelect");
+      sel.innerHTML = "";
+      const ph = document.createElement("option");
+      ph.value = ""; ph.textContent = "Select country…"; ph.disabled = true; ph.selected = true;
+      sel.appendChild(ph);
+
+      COUNTRY_LIST.forEach(c=>{
+        const o = document.createElement("option");
+        o.value = c.code; o.textContent = c.name;
+        sel.appendChild(o);
+      });
+
+      sel.onchange = async ()=>{
+        const code = sel.value;
+        SELECTED_COUNTRY_CODE = code;
+        await loadCitiesForCountryCode(code, "");
+      };
+    }
+
+    async function loadCitiesForCountryCode(code, preferCity=""){
+      const citySel = document.getElementById("citySelect");
+      const cityOther = document.getElementById("cityOther");
+      citySel.innerHTML = "";
+      citySel.disabled = false;
+
+      // Singapore: cityless
+      if (code === "SG"){
+        const o = document.createElement("option");
+        o.value = "Singapore"; o.textContent = "Singapore"; o.selected = true;
+        citySel.appendChild(o);
+        citySel.disabled = true;
+        return;
+      }
+
+      try{
+        showLoader(true);
+        const r = await fetch(`/geo/cities?code=${encodeURIComponent(code)}`);
+        const data = await r.json();
+        const cities = data.cities || [];
+        citySel.innerHTML = "";
+
+        const o0=document.createElement("option");
+        o0.value=""; o0.textContent="Select city…"; o0.disabled=true; o0.selected=true;
+        citySel.appendChild(o0);
+
+        cities.forEach(n=>{
+          const o=document.createElement("option");
+          o.value=n; o.textContent=n;
+          citySel.appendChild(o);
+        });
+
+        if (preferCity){
+          const options = [...citySel.options].map(op=>op.value);
+          if (options.includes(preferCity)) citySel.value = preferCity;
+        }
+      }catch(e){
+        citySel.innerHTML = "";
+        const o0=document.createElement("option");
+        o0.value=""; o0.textContent="(No cities available)"; o0.disabled=true; o0.selected=true;
+        citySel.appendChild(o0);
+      } finally {
+        showLoader(false);
+      }
+    }
+
+    // ---------- Planner ----------
+    function openPlanner(mode="create", ev=null){
+      plannerMode = mode;
+      editingId = ev?.id ?? null;
+      document.getElementById("plannerTitle").textContent = mode==="edit" ? "Edit Event" : "Plan New Event";
+      document.getElementById("eventMsg").textContent = "";
+
+      document.getElementById("eventName").value = ev?.event_name || "";
+      currentDateISO = ev?.date || "";
+      document.getElementById("eventDate").value = currentDateISO;
+      setDateLabel(currentDateISO);
+
+      const sel = document.getElementById("countrySelect");
+      if (!sel.value && SELECTED_COUNTRY_CODE) sel.value = SELECTED_COUNTRY_CODE;
+      if (sel.value){
+        loadCitiesForCountryCode(sel.value, ev?.city || "");
+      }
+
+      document.getElementById("planner").style.display = "flex";
+      document.getElementById("app").classList.add("blurred");
+    }
+    function closePlanner(){
+      document.getElementById("planner").style.display = "none";
+      document.getElementById("app").classList.remove("blurred");
+    }
+
+    async function saveEvent(){
+      const name = document.getElementById("eventName").value.trim();
+      const date = currentDateISO || document.getElementById("eventDate").value;
+      const countryCode = document.getElementById("countrySelect").value;
+      const citySel = document.getElementById("citySelect");
+      const city = citySel.disabled ? citySel.value : citySel.value; // SG -> "Singapore"
+      const msg = document.getElementById("eventMsg");
+
+      if(!name || !date || !countryCode){
+        msg.textContent="Please provide event name, date, and country."; return;
+      }
+      const match = COUNTRY_LIST.find(c=>c.code===countryCode);
+      const countryName = match ? match.name : "";
+
+      const body = { event_name:name, date, country:countryName };
+      if (city) body.city = city;
+      if (window.currentCoords) { body.lat=window.currentCoords.lat; body.lon=window.currentCoords.lon; }
+
+      try{
+        showLoader(true);
+        let r, data;
+        if (plannerMode === "edit" && editingId){
+          r = await fetch(`/events/${editingId}`, {
+            method:"PUT",
+            headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` },
+            body: JSON.stringify(body)
+          });
+          data = await r.json();
+          if(!r.ok) throw new Error(data.error||"Update failed");
+          closePlanner();
+          await openEventDetails({ id: editingId, event_name:name, city, date });
+        } else {
+          r = await fetch(`/events`, {
+            method:"POST",
+            headers:{ "Content-Type":"application/json", Authorization:`Bearer ${TOKEN}` },
+            body: JSON.stringify(body)
+          });
+          data = await r.json();
+          if(!r.ok) throw new Error(data.error||"Create failed");
+          closePlanner();
+          await openEventDetails(data);
+        }
+        await fetchEvents();
+      }catch(e){
+        msg.textContent = "Error: " + e.message;
+      } finally {
+        showLoader(false);
+      }
+    }
+
+    function wireDatePicker(){
+      const dateInput = document.getElementById("eventDate");
+      dateInput.addEventListener("change", () => {
+        currentDateISO = dateInput.value;
+        setDateLabel(currentDateISO);
       });
     }
-  } catch (e) {
-    console.warn("Geo/weather fetch error:", e);
-  }
-}, err => {
-  console.warn("Geolocation denied or unavailable:", err);
-  wxNow.textContent = "";
-  locLine.textContent = "";
-});
+    function setDateLabel(iso){
+      const label = document.getElementById("dateLabel");
+      if(!iso){ label.textContent = "No date selected"; return; }
+      const d = new Date(iso + "T00:00:00");
+      const day = d.getDate().toString().padStart(2,"0");
+      const mo  = d.toLocaleString(undefined,{month:"short"});
+      const yr  = d.getFullYear();
+      label.textContent = `${day} ${mo} ${yr}`;
+    }
 
-/* ------------------------------------
-   END: Script
------------------------------------- */
-</script>
+    // ---------- Events ----------
+    function toTitleCase(s){ return (s||"").replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()); }
+
+    async function fetchEvents(){
+      showLoader(true);
+      const r = await fetch(`/events`, {headers:{Authorization:`Bearer ${TOKEN}`}});
+      const data = await r.json();
+      showLoader(false);
+      const list = document.getElementById("eventsList");
+      list.innerHTML = "";
+      if(!Array.isArray(data) || data.length===0){
+        list.innerHTML = `<div class="muted">No events yet — use the <b>Plan</b> button above.</div>`;
+        return;
+      }
+      data.forEach(e=>{
+        const row=document.createElement("div"); row.className="item";
+        const left=document.createElement("div");
+        left.innerHTML=`<div class="item-title">${toTitleCase(e.event_name)}</div><div class="item-sub">${e.date}${e.city? " • "+e.city:""}</div>`;
+        const btns=document.createElement("div"); btns.className="btn-row";
+        const b1=document.createElement("button"); b1.className="btn btn-primary"; b1.textContent="View"; b1.onclick=()=>openEventDetails(e);
+        const b2=document.createElement("button"); b2.className="btn btn-ghost"; b2.textContent="Edit"; b2.onclick=()=>openPlanner('edit', e);
+        btns.appendChild(b1); btns.appendChild(b2);
+        row.appendChild(left); row.appendChild(btns); list.appendChild(row);
+      });
+    }
+
+    async function openEventDetails(e){
+      showLoader(true);
+      document.getElementById("eventTitle").textContent = toTitleCase(e.event_name);
+      document.getElementById("eventSub").textContent = `${e.date}${e.city ? " • " + e.city : ""}`;
+
+      const body = e.id ? {event_id:e.id} : {event_name:e.event_name, date:e.date, lat:e.lat, lon:e.lon};
+      const r = await fetch(`/suggest`, {method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${TOKEN}`}, body:JSON.stringify(body)});
+      const data = await r.json();
+
+      const headline = `<b>Predicted Weather:</b> ${data.predicted || "—"}`;
+      document.getElementById("eventHeadline").innerHTML = headline;
+      const tips = document.getElementById("eventTips"); tips.innerHTML="";
+      (data.advice||[]).forEach(t=>{ const li=document.createElement("li"); li.textContent=t; tips.appendChild(li); });
+      document.getElementById("eventNote").textContent = data.note || "";
+
+      showLoader(false);
+      hideAll(); document.getElementById("eventCard").classList.remove("hidden");
+    }
+  </script>
 </body>
 </html>
