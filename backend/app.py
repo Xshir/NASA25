@@ -6,9 +6,6 @@ import psycopg2
 from psycopg2 import pool as psycopool
 from psycopg2.extras import RealDictCursor
 
-# ------------------------------------------------------------------------------
-# App setup
-# ------------------------------------------------------------------------------
 app = Flask(__name__, static_folder=None)
 CORS(app, supports_credentials=False)
 app.logger.setLevel(logging.INFO)
@@ -27,17 +24,11 @@ DB_CFG = dict(
 
 db_pool: psycopg2.pool.SimpleConnectionPool | None = None
 
-# ------------------------------------------------------------------------------
-# In-memory caches for countries & cities
-# ------------------------------------------------------------------------------
-COUNTRY_CACHE = {"ts": 0, "data": []}                   # [{"name":"Singapore","code":"SG"}, ...]
-CITY_CACHE: dict[str, dict] = {}                         # {"SG": {"ts": 0, "data": ["Singapore"]}, ...}
-CACHE_TTL_COUNTRIES = 60 * 60 * 24 * 7                   # 7 days
-CACHE_TTL_CITIES = 60 * 60 * 24 * 3                      # 3 days
+COUNTRY_CACHE = {"ts": 0, "data": []}
+CITY_CACHE: dict[str, dict] = {}
+CACHE_TTL_COUNTRIES = 60 * 60 * 24 * 7
+CACHE_TTL_CITIES = 60 * 60 * 24 * 3
 
-# ------------------------------------------------------------------------------
-# DB init
-# ------------------------------------------------------------------------------
 def init_db_pool():
     global db_pool
     if db_pool:
@@ -61,13 +52,11 @@ def init_db_pool():
     ensure_schema()
 
 def ensure_schema():
-    """Create/upgrade schema idempotently (safe even if table already exists)."""
     conn = db_pool.getconn()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_advisory_lock(420420);")
-                # Base tables
                 cur.execute("""
                 CREATE TABLE IF NOT EXISTS app_users(
                     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -87,19 +76,14 @@ def ensure_schema():
                     lon DOUBLE PRECISION,
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 );""")
-                # Add missing columns safely
                 cur.execute("""ALTER TABLE events
                                ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();""")
-                # Indexes
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON app_users(username);")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id, date);")
                 cur.execute("SELECT pg_advisory_unlock(420420);")
     finally:
         db_pool.putconn(conn)
 
-# ------------------------------------------------------------------------------
-# Auth helpers
-# ------------------------------------------------------------------------------
 def _hash_pin(username, pin):
     return hashlib.sha256(f"{username}:{pin}:{APP_SECRET}".encode()).hexdigest()
 
@@ -135,11 +119,7 @@ def require_auth(fn):
         return fn(user=p, *a, **kw)
     return wrapper
 
-# ------------------------------------------------------------------------------
-# External weather data
-# ------------------------------------------------------------------------------
 def get_meteomatics_summary(lat: float, lon: float, date_iso: str):
-    """Fetch Meteomatics daily summary (free-tier safe)."""
     if not (MM_USER and MM_PASS):
         app.logger.warning("[Meteomatics] Missing credentials")
         return None
@@ -168,7 +148,6 @@ def get_meteomatics_summary(lat: float, lon: float, date_iso: str):
         return None
 
 def get_nasa_power(lat: float, lon: float, date_iso: str):
-    """NASA POWER climatology; skip gracefully for future dates."""
     try:
         d = dt.datetime.fromisoformat(date_iso)
         url = (
@@ -197,23 +176,18 @@ def get_nasa_power(lat: float, lon: float, date_iso: str):
         app.logger.error(f"[NASA EXC] {e}")
         return None
 
-# ------------------------------------------------------------------------------
 def interpret_conditions(m, event_name: str):
-    """Convert metrics + event name into readable prediction + tips."""
     if not m:
         return "mixed conditions", ["bring umbrella just in case", "water bottle", "sunscreen"]
-
     tips = []
     tmax = m.get("t_max"); rain = m.get("precip_24h", 0) or 0
     if tmax is not None and tmax >= 33: label = "very hot"
     elif rain >= 10: label = "very wet"
     elif tmax is not None and tmax <= 18: label = "cool"
     else: label = "fair"
-
     if label == "very hot": tips += ["bring shade/canopy", "portable fans", "stay hydrated"]
     if label == "very wet": tips += ["raincoat", "waterproof bag", "check shelter options"]
     if label == "cool": tips += ["light jacket"]
-
     e = (event_name or "").lower()
     if any(k in e for k in ["drone", "flying", "aerial"]):
         tips += ["check wind before flight", "bring ND filters", "spare batteries", "consider skipping if winds exceed 10 m/s"]
@@ -223,14 +197,10 @@ def interpret_conditions(m, event_name: str):
         tips += ["cooler with ice", "sunscreen", "ground mat"]
     elif any(k in e for k in ["hike", "trail", "trek"]):
         tips += ["hydration pack", "insect repellent", "trail shoes"]
-
     seen = set()
     tips = [t for t in tips if not (t in seen or seen.add(t))]
     return label, tips
 
-# ------------------------------------------------------------------------------
-# JSON error handlers
-# ------------------------------------------------------------------------------
 def _wants_json():
     a = request.headers.get("Accept",""); c = request.headers.get("Content-Type","")
     return ("application/json" in a) or ("application/json" in c)
@@ -246,9 +216,6 @@ def _500(e):
     app.logger.error(f"[500] {e}")
     return (jsonify({"error":"server error"}),500) if _wants_json() else ("Server error",500)
 
-# ------------------------------------------------------------------------------
-# Core routes
-# ------------------------------------------------------------------------------
 @app.get("/health")
 def health(): return jsonify({"ok": True, "ts": time.time()})
 
@@ -336,7 +303,6 @@ def update_event(user, event_id: int):
     country=(d.get("country") or "").strip() or None
     lat=d.get("lat"); lon=d.get("lon")
     if not name or not date: return jsonify({"error":"missing fields"}),400
-
     conn=db_pool.getconn()
     try:
         with conn,conn.cursor(cursor_factory=RealDictCursor) as c:
@@ -368,15 +334,15 @@ def suggest(user):
                 event_name=event_name or row["event_name"]; date=date or row["date"]
                 lat=lat if lat is not None else row["lat"]; lon=lon if lon is not None else row["lon"]
         finally: db_pool.putconn(conn)
-
     app.logger.info(f"[/suggest] event={event_name} date={date} coords=({lat},{lon})")
     mm=nasa=None
     if date and lat and lon:
         mm=get_meteomatics_summary(float(lat),float(lon),date)
         nasa=get_nasa_power(float(lat),float(lon),date)
-    app.logger.info(f"[/suggest] mm={mm} nasa={nasa}")
-
-    label,tips=interpret_conditions(mm,event_name)
+    merged=None
+    if mm: merged={"t_max":mm.get("t_max"),"precip_24h":mm.get("precip_24h",0)}
+    elif nasa: merged={"t_max":nasa.get("tmax"),"precip_24h":nasa.get("precip",0)}
+    label,tips=interpret_conditions(merged,event_name)
     stats_text=None
     if mm:
         tmax=mm.get("t_max"); rain=mm.get("precip_24h",0)
@@ -384,18 +350,14 @@ def suggest(user):
             stats_text=f"(Max {tmax:.1f}°C, Rain {rain:.1f} mm)"
     elif nasa:
         stats_text=f"(Max {nasa.get('tmax',0):.1f}°C, Rain {nasa.get('precip',0):.1f} mm)"
-
     return jsonify({
         "predicted": f"{label} {stats_text or ''}".strip(),
         "advice": tips,
-        "metrics": mm or {},
+        "metrics": mm or ({"t_max": merged.get("t_max"), "precip_24h": merged.get("precip_24h")} if merged else {}),
         "nasa_power": nasa or {},
-        "note": "Forecast fused from Meteomatics and NASA POWER climatology."
+        "note": "Forecast fused from Meteomatics and NASA POWER."
     })
 
-# ------------------------------------------------------------------------------
-# Current weather for Home screen
-# ------------------------------------------------------------------------------
 @app.get("/current_weather")
 def current_weather():
     lat = request.args.get("lat", type=float)
@@ -408,7 +370,6 @@ def current_weather():
         url = f"https://api.meteomatics.com/{now:%Y-%m-%dT%H:%M:%SZ}/{params}/{lat:.4f},{lon:.4f}/json"
         r = requests.get(url, auth=(MM_USER, MM_PASS), timeout=10)
         app.logger.info(f"[current_weather] {r.status_code} {url}")
-
         desc = "Unknown"
         temp = None
         if r.status_code == 200:
@@ -420,11 +381,7 @@ def current_weather():
             if sym is not None:
                 try: code = int(sym)
                 except: code = 0
-                desc = {
-                    1:"Clear",2:"Mostly clear",3:"Partly cloudy",4:"Overcast",
-                    5:"Fog",6:"Light rain",7:"Rain",8:"Heavy rain",9:"Snow",10:"Thunderstorms"
-                }.get(code,"Unknown")
-
+                desc = {1:"Clear",2:"Mostly clear",3:"Partly cloudy",4:"Overcast",5:"Fog",6:"Light rain",7:"Rain",8:"Heavy rain",9:"Snow",10:"Thunderstorms"}.get(code,"Unknown")
         if temp is None:
             return jsonify({})
         return jsonify({"temp": temp, "desc": desc})
@@ -432,12 +389,8 @@ def current_weather():
         app.logger.error(f"[current_weather EXC] {e}")
         return jsonify({})
 
-# ------------------------------------------------------------------------------
-# Geo endpoints: ALL countries + preset cities per country
-# ------------------------------------------------------------------------------
 @app.get("/geo/countries")
 def geo_countries():
-    """Return [{name, code}] of all countries (cached)."""
     try:
         now = time.time()
         if COUNTRY_CACHE["data"] and now - COUNTRY_CACHE["ts"] < CACHE_TTL_COUNTRIES:
@@ -456,58 +409,34 @@ def geo_countries():
         return jsonify(out)
     except Exception as e:
         app.logger.warning(f"[geo_countries] fallback due {e}")
-        fallback = [
-            {"name":"Singapore","code":"SG"},{"name":"Japan","code":"JP"},
-            {"name":"United States","code":"US"},{"name":"Malaysia","code":"MY"},
-            {"name":"Indonesia","code":"ID"},{"name":"Thailand","code":"TH"},
-            {"name":"Vietnam","code":"VN"},{"name":"Philippines","code":"PH"},
-            {"name":"India","code":"IN"},{"name":"China","code":"CN"},
-            {"name":"Australia","code":"AU"},{"name":"United Kingdom","code":"GB"}
-        ]
+        fallback = [{"name":"Singapore","code":"SG"},{"name":"Japan","code":"JP"},{"name":"United States","code":"US"},{"name":"Malaysia","code":"MY"},{"name":"Indonesia","code":"ID"},{"name":"Thailand","code":"TH"},{"name":"Vietnam","code":"VN"},{"name":"Philippines","code":"PH"},{"name":"India","code":"IN"},{"name":"China","code":"CN"},{"name":"Australia","code":"AU"},{"name":"United Kingdom","code":"GB"}]
         return jsonify(fallback)
 
 @app.get("/geo/cities")
 def geo_cities():
-    """
-    Return top cities for a given country.
-    Query: ?code=SG or ?country=Singapore
-    Uses Overpass API (OSM) and caches results.
-    """
     code = (request.args.get("code") or "").strip().upper()
     country = (request.args.get("country") or "").strip()
-
-    # Special case: Singapore as a city-state
     if code == "SG" or country.lower() == "singapore":
-        return jsonify({"code":"SG","country":"Singapore","cities":[],"cityless":True})
-
-    # Resolve code via cache if only country provided
+        return jsonify({"code":"SG","country":"Singapore","cities":[],"cityless":True,"centroid":{"lat":1.3521,"lon":103.8198}})
     if not code and country:
         if not COUNTRY_CACHE["data"]:
             try:
                 rc = requests.get("https://restcountries.com/v3.1/all?fields=name,cca2", timeout=10)
                 if rc.status_code == 200:
-                    COUNTRY_CACHE["data"] = [
-                        {"name": (it.get("name",{}) or {}).get("common"), "code": it.get("cca2","").upper()}
-                        for it in rc.json() if (it.get("name",{}) or {}).get("common") and it.get("cca2")
-                    ]
+                    COUNTRY_CACHE["data"] = [{"name": (it.get("name",{}) or {}).get("common"), "code": it.get("cca2","").upper()} for it in rc.json() if (it.get("name",{}) or {}).get("common") and it.get("cca2")]
             except Exception:
                 pass
         for item in COUNTRY_CACHE["data"]:
             if item["name"].lower() == country.lower():
                 code = item["code"]
                 break
-
     if not code:
         return jsonify({"cities":[]})
-
-    # cache
     now = time.time()
     cached = CITY_CACHE.get(code)
     if cached and (now - cached["ts"] < CACHE_TTL_CITIES):
         return jsonify({"code": code, "country": country or code, "cities": cached["data"]})
-
     try:
-        # Overpass query: cities and large towns within country by ISO3166-1 code
         q = f"""
         [out:json][timeout:25];
         area["ISO3166-1"="{code}"][admin_level=2]->.boundary;
@@ -515,13 +444,12 @@ def geo_cities():
           node["place"="city"](area.boundary);
           node["place"="town"](area.boundary);
         );
-        out tags;
+        out body geom qt;
         """
         r = requests.post("https://overpass-api.de/api/interpreter", data=q.encode("utf-8"), timeout=30)
         if r.status_code != 200:
             app.logger.warning(f"[geo_cities] Overpass {r.status_code}: {r.text[:120]}")
             return jsonify({"code":code, "country":country or code, "cities":[]})
-
         js = r.json()
         items = []
         for el in js.get("elements", []):
@@ -531,26 +459,21 @@ def geo_cities():
             pop = tags.get("population")
             try: pop = int(str(pop).replace(",","")) if pop else 0
             except Exception: pop = 0
-            items.append((nm, pop))
-
-        # dedupe by name keep max pop
+            lat = el.get("lat"); lon = el.get("lon")
+            if lat is None or lon is None: continue
+            items.append((nm, pop, lat, lon))
         byname = {}
-        for nm, pop in items:
-            if nm not in byname or pop > byname[nm]:
-                byname[nm] = pop
-        # sort by population desc, then name
-        sorted_names = sorted(byname.items(), key=lambda x:(-x[1], x[0]))[:80]
-        cities = [nm for nm,_ in sorted_names] or sorted(byname.keys())[:80]
-
+        for nm, pop, lat, lon in items:
+            if nm not in byname or pop > byname[nm]["pop"]:
+                byname[nm] = {"name": nm, "pop": pop, "lat": lat, "lon": lon}
+        sorted_items = sorted(byname.values(), key=lambda x:(-x["pop"], x["name"]))[:80]
+        cities = [{"name": it["name"], "lat": it["lat"], "lon": it["lon"]} for it in sorted_items] or [{"name": it["name"], "lat": it["lat"], "lon": it["lon"]} for it in list(byname.values())[:80]]
         CITY_CACHE[code] = {"ts": now, "data": cities}
         return jsonify({"code": code, "country": country or code, "cities": cities})
     except Exception as e:
         app.logger.error(f"[geo_cities EXC] {e}")
         return jsonify({"code": code, "country": country or code, "cities": []})
 
-# ------------------------------------------------------------------------------
-# Reverse geocoding (adds country_code)
-# ------------------------------------------------------------------------------
 def reverse_geocode_core(lat: float, lon: float):
     try:
         r = requests.get(
@@ -578,9 +501,6 @@ def api_reverse_geocode():
         return jsonify({})
     return jsonify(reverse_geocode_core(lat, lon))
 
-# ------------------------------------------------------------------------------
-# Static frontend
-# ------------------------------------------------------------------------------
 @app.get("/")
 def root(): return send_from_directory("/app/static","index.html")
 
@@ -589,7 +509,6 @@ def static_proxy(path):
     try: return send_from_directory("/app/static",path)
     except Exception: return _404(None)
 
-# ------------------------------------------------------------------------------
 init_db_pool()
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=8000,debug=True)
