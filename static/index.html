@@ -116,14 +116,12 @@
     #gate ul{margin:.5rem 0 .75rem 1.2rem}
     #weatherBar{ position:fixed; bottom:0; left:0; right:0; text-align:center; padding:.55rem; border-top:1px solid rgba(255,255,255,.08); background:rgba(18,27,41,.92); font-size:.92rem }
 
-    /* Loader overlay */
     #loaderOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3000;
       background:rgba(10,15,25,.75); backdrop-filter:blur(8px); }
     .loader{ width:64px; height:64px; border:4px solid rgba(255,255,255,.25); border-top:4px solid var(--teal);
       border-radius:50%; animation:spin 1s linear infinite; }
     @keyframes spin{ to{ transform:rotate(360deg) } }
 
-    /* Welcome overlay */
     #welcomeOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:3500;
       background:rgba(10,15,25,.95); color:#fff; flex-direction:column; transition:opacity 1.5s ease; }
     #welcomeOverlay h2{ font-size:2rem; color:var(--teal); margin:0; }
@@ -258,14 +256,14 @@
   <div id="welcomeOverlay"><h2 id="welcomeText"></h2></div>
 
   <script>
-    // ---------- Globals & routing ----------
     const API_BASE = "";
     let TOKEN = localStorage.getItem("token") || null;
     let currentDateISO = "";
     let plannerMode = "create";
     let editingId = null;
-    let COUNTRY_LIST = []; // [{name,code}]
+    let COUNTRY_LIST = [];
     let SELECTED_COUNTRY_CODE = "";
+    let SELECTED_CITY_COORDS = null; // {lat, lon}
 
     function hideAll(){ document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden")); }
     function showLogin(){ hideAll(); document.getElementById("loginCard").classList.remove("hidden"); }
@@ -288,13 +286,12 @@
 
     window.addEventListener("load", async () => {
       tickClock(); setInterval(tickClock, 1000);
-      await loadCountries(); // populate countries first
+      await loadCountries();
       ensureGeoPermission();
       if (TOKEN) showHome(); else showLogin();
       wireDatePicker();
     });
 
-    // ---------- Auth ----------
     async function signup(){
       const username = document.getElementById("signupUsername").value.trim().toLowerCase();
       const pin = document.getElementById("signupPin").value.trim();
@@ -317,7 +314,6 @@
     }
     function logout(){ TOKEN=null; localStorage.removeItem("token"); showLogin(); }
 
-    // ---------- Clock ----------
     function tickClock(){
       const now = new Date();
       const hh = now.getHours().toString().padStart(2,"0");
@@ -325,7 +321,6 @@
       document.getElementById("clock").textContent = `${hh}:${mm}`;
     }
 
-    // ---------- Geolocation with prompt control ----------
     function askForLocation(){ requestLocation(true); }
 
     async function ensureGeoPermission(){
@@ -352,7 +347,7 @@
       }
     }
 
-    function requestLocation(spawnPrompt=false){
+    function requestLocation(){
       navigator.geolocation.getCurrentPosition(async (pos)=>{
         const {latitude, longitude} = pos.coords;
         window.currentCoords = {lat:latitude, lon:longitude};
@@ -386,7 +381,6 @@
         const loc = [data.city, data.country].filter(Boolean).join(", ");
         document.getElementById("locLine").textContent = loc || "";
 
-        // Best-effort preselect using country_code; fallback to name match
         let code = data.country_code || "";
         if (!code && data.country){
           const hit = COUNTRY_LIST.find(c => c.name.toLowerCase() === data.country.toLowerCase());
@@ -407,7 +401,6 @@
     function showGate(){ document.getElementById("gate").style.display="flex"; }
     function hideGate(){ document.getElementById("gate").style.display="none"; }
 
-    // ---------- Current Weather (Home header) ----------
     async function updateCurrentWeather(lat, lon){
       try{
         const r = await fetch(`/current_weather?lat=${lat}&lon=${lon}`);
@@ -422,7 +415,6 @@
       }
     }
 
-    // ---------- Countries & Cities (ALL countries, preset cities) ----------
     async function loadCountries(){
       try{
         const r = await fetch(`/geo/countries`);
@@ -445,6 +437,7 @@
       sel.onchange = async ()=>{
         const code = sel.value;
         SELECTED_COUNTRY_CODE = code;
+        SELECTED_CITY_COORDS = null;
         await loadCitiesForCountryCode(code, "");
       };
     }
@@ -454,13 +447,16 @@
       const cityOther = document.getElementById("cityOther");
       citySel.innerHTML = "";
       citySel.disabled = false;
+      cityOther.classList.add("hidden");
+      cityOther.value = "";
+      SELECTED_CITY_COORDS = null;
 
-      // Singapore: cityless
       if (code === "SG"){
         const o = document.createElement("option");
         o.value = "Singapore"; o.textContent = "Singapore"; o.selected = true;
         citySel.appendChild(o);
         citySel.disabled = true;
+        await geocodeCity("Singapore", "Singapore");
         return;
       }
 
@@ -481,9 +477,23 @@
           citySel.appendChild(o);
         });
 
-        if (preferCity){
-          const options = [...citySel.options].map(op=>op.value);
-          if (options.includes(preferCity)) citySel.value = preferCity;
+        const oX=document.createElement("option");
+        oX.value="__other"; oX.textContent="Other (type manually)";
+        citySel.appendChild(oX);
+
+        citySel.onchange = async ()=>{
+          if (citySel.value === "__other"){
+            cityOther.classList.remove("hidden");
+            SELECTED_CITY_COORDS = null;
+          }else if (citySel.value){
+            cityOther.classList.add("hidden");
+            await geocodeCity(citySel.value, getCountryNameByCode(code));
+          }
+        };
+
+        if (preferCity && cities.includes(preferCity)){
+          citySel.value = preferCity;
+          await geocodeCity(preferCity, getCountryNameByCode(code));
         }
       }catch(e){
         citySel.innerHTML = "";
@@ -495,7 +505,28 @@
       }
     }
 
-    // ---------- Planner ----------
+    function getCountryNameByCode(code){
+      const m = COUNTRY_LIST.find(c=>c.code===code);
+      return m ? m.name : "";
+    }
+
+    async function geocodeCity(city, country){
+      try{
+        const q = encodeURIComponent(`${city}, ${country}`);
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${q}`,{
+          headers:{'Accept':'application/json'}
+        });
+        const arr = await res.json();
+        if(arr && arr[0]){
+          SELECTED_CITY_COORDS = { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon) };
+        } else {
+          SELECTED_CITY_COORDS = null;
+        }
+      } catch {
+        SELECTED_CITY_COORDS = null;
+      }
+    }
+
     function openPlanner(mode="create", ev=null){
       plannerMode = mode;
       editingId = ev?.id ?? null;
@@ -526,18 +557,27 @@
       const date = currentDateISO || document.getElementById("eventDate").value;
       const countryCode = document.getElementById("countrySelect").value;
       const citySel = document.getElementById("citySelect");
-      const city = citySel.disabled ? citySel.value : citySel.value; // SG -> "Singapore"
+      const cityOther = document.getElementById("cityOther");
       const msg = document.getElementById("eventMsg");
+
+      let city = "";
+      if (citySel.disabled){ city = citySel.value; }
+      else if (citySel.value === "__other"){ city = cityOther.value.trim(); }
+      else { city = citySel.value; }
 
       if(!name || !date || !countryCode){
         msg.textContent="Please provide event name, date, and country."; return;
       }
-      const match = COUNTRY_LIST.find(c=>c.code===countryCode);
-      const countryName = match ? match.name : "";
+      const countryName = getCountryNameByCode(countryCode);
+
+      if (!window.currentCoords && !SELECTED_CITY_COORDS && city){
+        await geocodeCity(city, countryName);
+      }
 
       const body = { event_name:name, date, country:countryName };
       if (city) body.city = city;
       if (window.currentCoords) { body.lat=window.currentCoords.lat; body.lon=window.currentCoords.lon; }
+      else if (SELECTED_CITY_COORDS) { body.lat=SELECTED_CITY_COORDS.lat; body.lon=SELECTED_CITY_COORDS.lon; }
 
       try{
         showLoader(true);
@@ -551,7 +591,7 @@
           data = await r.json();
           if(!r.ok) throw new Error(data.error||"Update failed");
           closePlanner();
-          await openEventDetails({ id: editingId, event_name:name, city, date });
+          await openEventDetails({ id: editingId, event_name:name, city, date, lat: body.lat, lon: body.lon });
         } else {
           r = await fetch(`/events`, {
             method:"POST",
@@ -561,7 +601,7 @@
           data = await r.json();
           if(!r.ok) throw new Error(data.error||"Create failed");
           closePlanner();
-          await openEventDetails(data);
+          await openEventDetails({...data, lat: body.lat, lon: body.lon});
         }
         await fetchEvents();
       }catch(e){
@@ -588,7 +628,6 @@
       label.textContent = `${day} ${mo} ${yr}`;
     }
 
-    // ---------- Events ----------
     function toTitleCase(s){ return (s||"").replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()); }
 
     async function fetchEvents(){
