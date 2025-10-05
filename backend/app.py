@@ -286,41 +286,54 @@ def delete_event(user, event_id):
 @require_auth
 def suggest(user):
     data = request.get_json(force=True)
-    event_name = (data.get("event_name") or "").lower()
+
+    event_name = (data.get("event_name") or "").strip()
     date = data.get("date")
     lat = data.get("lat")
     lon = data.get("lon")
 
-    # Dummy “prediction” text; plug real data later
-    predicted = "might be hot" if date else "mixed conditions"
+    # If event_id is provided, load event details from DB
+    event_id = data.get("event_id")
+    if event_id:
+        conn = db_pool.getconn()
+        try:
+            with conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT event_name, date::text AS date, lat, lon, city, country
+                    FROM events
+                    WHERE id = %s AND user_id = %s
+                """, (event_id, user["id"]))
+                row = cur.fetchone()
+                if not row:
+                    return jsonify({"error": "event not found"}), 404
+                event_name = event_name or (row.get("event_name") or "")
+                date = date or row.get("date")
+                lat = lat if lat is not None else row.get("lat")
+                lon = lon if lon is not None else row.get("lon")
+        finally:
+            db_pool.putconn(conn)
 
-    # Very lightweight classifier from event text (hidden from user)
-    tips = []
-    activity = "general"
+    # Simple prototype logic — varies by event name keywords
+    e = event_name.lower()
+    predicted = "mixed conditions" if not date else "might be hot"
+    tips, activity = [], "general"
 
-    e = event_name
     if any(k in e for k in ["picnic","bbq","barbecue","beach","park"]):
-        activity = "picnic"
-        tips += ["bring umbrella", "pack extra ice", "carry sunscreen", "portable fan"]
+        activity, tips = "picnic", ["bring umbrella", "pack extra ice", "carry sunscreen", "portable fan"]
     elif any(k in e for k in ["hike","trail","trek"]):
-        activity = "hike"
-        tips += ["hydration pack", "insect repellent", "light rain jacket", "trail shoes"]
+        activity, tips = "hike", ["hydration pack", "insect repellent", "light rain jacket", "trail shoes"]
     elif any(k in e for k in ["drone","flying","aerial"]):
-        activity = "drone"
-        tips += ["check wind speeds", "spare batteries", "ND filters", "avoid no-fly zones"]
+        activity, tips = "drone", ["check wind speeds", "spare batteries", "ND filters", "avoid no-fly zones"]
     elif any(k in e for k in ["wedding","ceremony","outdoor event","party"]):
-        activity = "ceremony"
-        tips += ["rent canopy options", "cooling fans", "backup indoor space", "ice chests"]
+        activity, tips = "ceremony", ["rent canopy options", "cooling fans", "backup indoor space", "ice chests"]
     else:
-        tips += ["umbrella just in case", "water bottle", "sunscreen"]
-
-    note = "Prototype suggestions. We’ll swap in NASA/Meteomatics-based probabilities next."
+        tips = ["umbrella just in case", "water bottle", "sunscreen"]
 
     return jsonify({
         "predicted": predicted,
         "activity": activity,
         "advice": tips,
-        "note": note
+        "note": "Prototype suggestions. NASA/Meteomatics integration coming next."
     })
 
 # -----------------------------------------------------------------------------
